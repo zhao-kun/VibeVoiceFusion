@@ -275,7 +275,7 @@ class VibeVoiceProcessor:
         
         # Process voice samples if provided
         if voice_samples:
-            voice_tokens, voice_speech_inputs, voice_speech_masks = self._create_voice_prompt(voice_samples[:len(all_speakers)])
+            voice_tokens, voice_speech_inputs, voice_speech_masks = self._create_voice_prompt(voice_samples)
         else:
             voice_tokens, voice_speech_inputs, voice_speech_masks = [], [], []
         

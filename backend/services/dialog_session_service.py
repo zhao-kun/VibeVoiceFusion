@@ -316,11 +316,11 @@ class DialogSessionService:
             return self.scripts_dir / session.text_filename
         return None
 
-    def parse_session_txt_script(self, session_id: str) -> Tuple[str, List[str], List[str]]:
+    def parse_session_txt_script(self, session_id: str) -> Tuple[str, List[str], List[str], int]:
         """
         Parse txt script content and extract speakers and their text
         Fixed pattern: Speaker 1, Speaker 2, Speaker 3, Speaker 4
-        Returns: (txt_content, scripts, unique_speaker_names)
+        Returns: (txt_content, scripts, unique_speaker_names, max_speaker_id)
         """
         txt_content: str = self.get_session_text(session_id)
         if txt_content is None:
@@ -335,6 +335,7 @@ class DialogSessionService:
         current_speaker = None
         current_text = ""
         unique_speaker_names: Set[str] = set()
+        max_speaker_id = 1
 
         for line in lines:
             line = line.strip()
@@ -347,6 +348,8 @@ class DialogSessionService:
                 if current_speaker and current_text:
                     scripts.append(f"Speaker {current_speaker}: {current_text.strip()}")
                     speaker_numbers.append(current_speaker)
+                    if current_speaker.isdigit():
+                        max_speaker_id = max(max_speaker_id, int(current_speaker))
                     unique_speaker_names.add(f"Speaker {current_speaker}")
 
                 # Start new speaker
@@ -363,5 +366,8 @@ class DialogSessionService:
         if current_speaker and current_text:
             scripts.append(f"Speaker {current_speaker}: {current_text.strip()}")
             speaker_numbers.append(current_speaker)
+            if current_speaker.isdigit():
+                max_speaker_id = max(max_speaker_id, int(current_speaker))
+            unique_speaker_names.add(f"Speaker {current_speaker}")
 
-        return txt_content, scripts, sorted(list(unique_speaker_names))
+        return txt_content, scripts, list(unique_speaker_names), max_speaker_id

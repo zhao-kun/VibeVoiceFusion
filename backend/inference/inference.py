@@ -138,13 +138,17 @@ class InferenceBase(ABC):
 
         get_generator(self.generation.seeds)
 
-        txt_content, scripts, unique_speaker_names = self.dialog_service.parse_session_txt_script(self.generation.session_id)
+        txt_content, scripts, unique_speaker_names, max_speaker_id = self.dialog_service.parse_session_txt_script(self.generation.session_id)
         if not scripts or not unique_speaker_names:
             raise RuntimeError("No scripts, speaker_numbers found for the specified dialog session.")
 
-        voice_sample = self.speaker_service.get_speakers_filepath(unique_speaker_names)
-        logger.info(f"Loaded voice samples for speakers: {unique_speaker_names}")
+        voice_names = []
+        for i in range(max_speaker_id):
+            voice_names.append(f"Speaker {i+1}")
+        
+        voice_sample = self.speaker_service.get_speakers_filepath(voice_names)
 
+        logger.info(f"Max speaker ID: {max_speaker_id}, unique speakers: {unique_speaker_names}, all voice samples: {voice_sample}")
         # Proceed with inference using txt_content, scripts, and speaker_numbers
         # ...
         full_script = '\n'.join(scripts)
@@ -152,7 +156,8 @@ class InferenceBase(ABC):
 
         status_update(InferencePhase.PREPROCESSING, scripts=scripts,
                       unique_speaker_names=unique_speaker_names,
-                      voice_sample=voice_sample)
+                      voice_sample=voice_sample,
+                      max_speaker_id=max_speaker_id)
 
         processor = VibeVoiceProcessor.from_pretrained(None)
         inputs = processor(text=[full_script],
