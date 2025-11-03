@@ -107,9 +107,17 @@ export default function Navigation() {
       {/* Logo/Header */}
       <div className="p-6 border-b border-gray-800">
         <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-white">{t('app.title')}</h1>
-            <p className="text-xs text-gray-400 mt-1">{t('app.subtitle')}</p>
+          <div className="flex items-center gap-3 flex-1">
+            {/* Logo */}
+            <img
+              src="/icon-rect-pulse.svg"
+              alt="VibeVoice Logo"
+              className="w-10 h-10 flex-shrink-0"
+            />
+            <div>
+              <h1 className="text-xl font-bold text-white">{t('app.title')}</h1>
+              <p className="text-xs text-gray-400 mt-1">{t('app.subtitle')}</p>
+            </div>
           </div>
           {/* GitHub Link */}
           <a

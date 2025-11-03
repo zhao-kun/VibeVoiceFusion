@@ -76,6 +76,14 @@ export default function ProjectSelector() {
       <div className="max-w-6xl w-full">
         {/* Header */}
         <div className="text-center mb-12">
+          {/* Logo */}
+          <div className="flex justify-center mb-6">
+            <img
+              src="/icon-rect-pulse.svg"
+              alt="VibeVoice Logo"
+              className="w-24 h-24"
+            />
+          </div>
           <h1 className="text-5xl font-bold text-gray-900 mb-4">{t('app.title')}</h1>
           <p className="text-xl text-gray-600">{t('app.subtitle')}</p>
           <p className="text-sm text-gray-500 mt-2">{t('project.selectProject')}</p>

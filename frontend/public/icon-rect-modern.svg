@@ -1,0 +1,49 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Vibrant blue background -->
+  <defs>
+    <linearGradient id="blueGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0ea5e9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0284c7;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Rectangle background -->
+  <rect x="0" y="0" width="200" height="200" rx="40" fill="url(#blueGrad3)"/>
+
+  <!-- Audio spectrum visualization behind V -->
+  <g opacity="0.25">
+    <rect x="45" y="120" width="6" height="30" rx="3" fill="#ffffff"/>
+    <rect x="56" y="105" width="6" height="50" rx="3" fill="#ffffff"/>
+    <rect x="67" y="85" width="6" height="75" rx="3" fill="#ffffff"/>
+    <rect x="78" y="70" width="6" height="95" rx="3" fill="#ffffff"/>
+    <rect x="89" y="60" width="6" height="110" rx="3" fill="#ffffff"/>
+    <rect x="105" y="60" width="6" height="110" rx="3" fill="#ffffff"/>
+    <rect x="116" y="70" width="6" height="95" rx="3" fill="#ffffff"/>
+    <rect x="127" y="85" width="6" height="75" rx="3" fill="#ffffff"/>
+    <rect x="138" y="105" width="6" height="50" rx="3" fill="#ffffff"/>
+    <rect x="149" y="120" width="6" height="30" rx="3" fill="#ffffff"/>
+  </g>
+
+  <!-- White V (bold) -->
+  <path d="M 50 50 L 100 140 L 150 50"
+        stroke="#ffffff"
+        stroke-width="16"
+        fill="none"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Voice wave accent at bottom -->
+  <path d="M 40 170 Q 60 165 80 170 T 120 170 T 160 170"
+        stroke="#ffffff"
+        stroke-width="3"
+        fill="none"
+        opacity="0.6"
+        stroke-linecap="round"/>
+
+  <path d="M 40 180 Q 70 175 100 180 T 160 180"
+        stroke="#ffffff"
+        stroke-width="2.5"
+        fill="none"
+        opacity="0.4"
+        stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,48 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Blue gradient background -->
+  <defs>
+    <linearGradient id="blueGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Rectangle background with rounded corners -->
+  <rect x="0" y="0" width="200" height="200" rx="40" fill="url(#blueGrad1)"/>
+
+  <!-- White V -->
+  <path d="M 50 50 L 100 140 L 150 50"
+        stroke="#ffffff"
+        stroke-width="18"
+        fill="none"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Sound waves radiating from top of V -->
+  <g opacity="0.7">
+    <!-- Right waves -->
+    <path d="M 155 60 Q 165 70 155 80" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+    <path d="M 165 55 Q 180 70 165 85" stroke="#ffffff" stroke-width="3" stroke-linecap="round" fill="none"/>
+    <path d="M 175 50 Q 195 70 175 90" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+
+    <!-- Left waves -->
+    <path d="M 45 60 Q 35 70 45 80" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+    <path d="M 35 55 Q 20 70 35 85" stroke="#ffffff" stroke-width="3" stroke-linecap="round" fill="none"/>
+    <path d="M 25 50 Q 5 70 25 90" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  </g>
+
+  <!-- Audio waveform at bottom -->
+  <g opacity="0.5">
+    <rect x="60" y="165" width="3" height="15" rx="1.5" fill="#ffffff"/>
+    <rect x="67" y="160" width="3" height="25" rx="1.5" fill="#ffffff"/>
+    <rect x="74" y="155" width="3" height="35" rx="1.5" fill="#ffffff"/>
+    <rect x="81" y="162" width="3" height="22" rx="1.5" fill="#ffffff"/>
+    <rect x="88" y="158" width="3" height="30" rx="1.5" fill="#ffffff"/>
+    <rect x="95" y="150" width="3" height="45" rx="1.5" fill="#ffffff"/>
+    <rect x="102" y="158" width="3" height="30" rx="1.5" fill="#ffffff"/>
+    <rect x="109" y="162" width="3" height="22" rx="1.5" fill="#ffffff"/>
+    <rect x="116" y="155" width="3" height="35" rx="1.5" fill="#ffffff"/>
+    <rect x="123" y="160" width="3" height="25" rx="1.5" fill="#ffffff"/>
+    <rect x="130" y="165" width="3" height="15" rx="1.5" fill="#ffffff"/>
+  </g>
+</svg>

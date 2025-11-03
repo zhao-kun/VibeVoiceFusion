@@ -1,0 +1,47 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Royal blue background -->
+  <defs>
+    <linearGradient id="blueGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a8a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e40af;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Rectangle background -->
+  <rect x="0" y="0" width="200" height="200" rx="40" fill="url(#blueGrad4)"/>
+
+  <!-- Large white V -->
+  <path d="M 40 40 L 100 150 L 160 40"
+        stroke="#ffffff"
+        stroke-width="22"
+        fill="none"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Sound waves emanating from V apex -->
+  <g opacity="0.5">
+    <!-- Top waves -->
+    <circle cx="100" cy="40" r="20" fill="none" stroke="#ffffff" stroke-width="2.5"/>
+    <circle cx="100" cy="40" r="30" fill="none" stroke="#ffffff" stroke-width="2"/>
+    <circle cx="100" cy="40" r="40" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+  </g>
+
+  <!-- Waveform pattern at bottom -->
+  <g opacity="0.6">
+    <path d="M 30 175 L 35 170 L 40 175 L 45 170 L 50 175 L 55 170 L 60 175"
+          stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M 70 175 L 75 168 L 80 175 L 85 168 L 90 175 L 95 168 L 100 175"
+          stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M 100 175 L 105 168 L 110 175 L 115 168 L 120 175 L 125 168 L 130 175"
+          stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M 140 175 L 145 170 L 150 175 L 155 170 L 160 175 L 165 170 L 170 175"
+          stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- Microphone indicator dots -->
+  <g opacity="0.7">
+    <circle cx="95" cy="165" r="2.5" fill="#ffffff"/>
+    <circle cx="100" cy="165" r="3" fill="#ffffff"/>
+    <circle cx="105" cy="165" r="2.5" fill="#ffffff"/>
+  </g>
+</svg>
