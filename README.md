@@ -207,25 +207,125 @@ cd frontend
 npm run dev  # http://localhost:3000
 ```
 
-**Workflow:**
-1. Create a new project
-2. Add speakers by uploading voice samples (auto-named "Speaker 1", "Speaker 2", etc.)
-3. Create a dialog session and edit the dialog:
-   ```
-   Speaker 1: First line of dialog here
-   Speaker 2: Second speaker responds
-   Speaker 1: First speaker continues
-   ```
-4. Go to "Generate Voice" page
-5. Select your dialog session
-6. Configure parameters:
-   - Model Type: float8 (recommended) or bfloat16
-   - CFG Scale: 1.0 - 2.0 (default: 1.3)
-   - Random Seed: Any positive integer
-   - Offloading: Enable if VRAM < 14GB
-7. Click "Start Generation"
-8. Monitor real-time progress
-9. Download or play the generated audio
+### Complete Workflow Guide
+
+This guide walks you through the complete process of creating multi-speaker voice generation from start to finish.
+
+#### Step 1: Create a Project
+
+Start by creating a new project or selecting an existing one. Projects help organize your voice generation work with metadata and descriptions.
+
+<div align="center">
+<img src="docs/images/home-eng.png" alt="Project Management" width="700"/>
+<p><i>Create and manage projects from the home page</i></p>
+</div>
+
+**Actions:**
+- Click "Create New Project" card
+- Enter a project name (e.g., "Podcast Episode 1")
+- Optionally add a description
+- Click "Create Project"
+
+The project will be automatically selected and you'll be navigated to the Speaker Role page.
+
+#### Step 2: Add Speakers and Upload Voice Samples
+
+Upload reference voice samples for each speaker. The system supports various audio formats (WAV, MP3, M4A, FLAC, WebM).
+
+<div align="center">
+<img src="docs/images/speak-role-eng.png" alt="Speaker Management" width="700"/>
+<p><i>Upload and manage voice samples for each speaker</i></p>
+</div>
+
+**Actions:**
+- Click "Add New Speaker" button
+- The speaker will be automatically named (e.g., "Speaker 1", "Speaker 2")
+- Click "Upload Voice" to select a reference audio file (3-30 seconds recommended)
+- Preview the uploaded voice using the audio player
+- Repeat for additional speakers (supports 2-4+ speakers)
+
+**Tips:**
+- Use clean audio with minimal background noise
+- 5-15 seconds of speech is ideal for voice cloning
+- Each speaker needs a unique voice sample
+- You can replace voice files later by clicking "Change Voice"
+
+#### Step 3: Create and Edit Dialog
+
+Create a dialog session and write the multi-speaker conversation. The dialog editor supports drag-and-drop reordering and real-time preview.
+
+<div align="center">
+<img src="docs/images/voice-editor-eng.png" alt="Dialog Editor" width="700"/>
+<p><i>Multi-speaker dialog editor with visual and text modes</i></p>
+</div>
+
+**Actions:**
+- Click "Create New Session" in the session list
+- Enter a session name (e.g., "Chapter 1")
+- In the dialog editor, add lines for each speaker:
+  - Select a speaker from the dropdown
+  - Enter the dialog text
+  - Click "Add Line" or press Enter
+- Reorder lines by dragging the handle icons
+- Use "Text Editor" mode for bulk editing
+- Click "Save" to persist your changes
+
+**Dialog Format (Text Mode):**
+```
+Speaker 1: Welcome to our podcast!
+
+Speaker 2: Thanks for having me. It's great to be here.
+
+Speaker 1: Let's dive into today's topic.
+```
+
+**Features:**
+- Visual editor with drag-and-drop
+- Text editor for bulk editing
+- Real-time preview
+- Copy and download functionality
+- Format validation
+
+#### Step 4: Generate Voice
+
+Configure generation parameters and start the voice synthesis process. Monitor real-time progress and manage generation history.
+
+<div align="center">
+<img src="docs/images/generate-voice-eng.png" alt="Voice Generation" width="700"/>
+<p><i>Generation interface with parameters, live progress, and history</i></p>
+</div>
+
+**Actions:**
+- Navigate to "Generate Voice" page
+- Select a dialog session from the dropdown
+- Configure parameters:
+  - **Model Type**:
+    - `float8_e4m3fn` (recommended): 7GB VRAM, faster loading
+    - `bfloat16`: 14GB VRAM, full precision
+  - **CFG Scale** (1.0-2.0): Controls generation adherence to text
+    - Lower (1.0-1.3): More natural, varied
+    - Higher (1.5-2.0): More controlled, may sound robotic
+    - Default: 1.3
+  - **Random Seed**: Any positive integer for reproducibility
+  - **Offloading** (optional): Enable if VRAM < 14GB
+    - **Balanced**: 12 GPU layers, ~5GB savings, 2.0x slower (RTX 3060 12GB, 4070)
+    - **Aggressive**: 8 GPU layers, ~6GB savings, 2.5x slower (RTX 3060 8GB)
+    - **Extreme**: 4 GPU layers, ~7GB savings, 3.5x slower (minimum 6GB VRAM)
+- Click "Start Generation"
+
+**Real-Time Monitoring:**
+- Progress bar shows completion percentage
+- Phase indicators: Preprocessing → Inferencing → Saving
+- Live token generation count
+- Estimated time remaining
+
+**Generation History:**
+- View all past generations with status (completed, failed, running)
+- Filter and sort by date, status, or session
+- Play generated audio inline
+- Download WAV files
+- Delete unwanted generations
+- View detailed metrics (tokens, duration, RTF, VRAM usage)
 
 #### Command-Line Interface
 
