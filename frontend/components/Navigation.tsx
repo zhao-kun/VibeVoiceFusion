@@ -124,7 +124,7 @@ export default function Navigation() {
             href="https://github.com/zhao-kun/vibevoice"
             target="_blank"
             rel="noopener noreferrer"
-            className="group flex-shrink-0 p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-all duration-200 hover:scale-110 border border-white/20"
+            className="group flex-shrink-0 self-start p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-all duration-200 hover:scale-110 border border-white/20"
             title={t('navigation.githubTooltip')}
           >
             <svg className="w-5 h-5 text-white group-hover:text-blue-300 transition-colors" fill="currentColor" viewBox="0 0 24 24">
