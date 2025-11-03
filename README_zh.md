@@ -118,33 +118,21 @@ VibeVoice 结合**自回归（AR）**和**扩散**技术进行文本转语音合
 
 ## 演示样本
 
-试听使用 VibeVoiceFusion 生成的语音样本。点击播放按钮收听效果：
+试听使用 VibeVoiceFusion 生成的语音样本。点击下方链接下载并播放：
 
 ### 单说话人
 
-**潘多拉魔盒故事（BFloat16 模型）**
-<audio controls>
-  <source src="demo/outputs/1p_pandora_box_bf16.wav" type="audio/wav">
-  您的浏览器不支持音频播放。
-</audio>
+**🎧 [潘多拉魔盒故事（BFloat16 模型）](https://raw.githubusercontent.com/zhao-kun/VibeVoiceFusion/main/demo/outputs/1p_pandora_box_bf16.wav)**
 
 *使用 bfloat16 精度模型生成 - 完整质量，需要 14GB 显存*
 
-**潘多拉魔盒故事（Float8 模型）**
-<audio controls>
-  <source src="demo/outputs/1p_pandora_box_float8_e4m3fn.wav" type="audio/wav">
-  您的浏览器不支持音频播放。
-</audio>
+**🎧 [潘多拉魔盒故事（Float8 模型）](https://raw.githubusercontent.com/zhao-kun/VibeVoiceFusion/main/demo/outputs/1p_pandora_box_float8_e4m3fn.wav)**
 
 *使用 float8 量化生成 - 优化至 7GB 显存，质量相当*
 
 ### 多说话人（3 个说话人）
 
-**东邪西毒 - 西游版**
-<audio controls>
-  <source src="demo/outputs/东邪西毒-西游版.wav" type="audio/wav">
-  您的浏览器不支持音频播放。
-</audio>
+**🎭 [东邪西毒 - 西游版](https://raw.githubusercontent.com/zhao-kun/VibeVoiceFusion/main/demo/outputs/东邪西毒-西游版.wav)**
 
 *多说话人对话，每个角色具有独特的声音特征*
 

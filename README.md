@@ -116,33 +116,21 @@ VibeVoice combines **autoregressive (AR)** and **diffusion** techniques for text
 
 ## Demo Samples
 
-Listen to voice generation samples created with VibeVoiceFusion. Click the play button to hear the results:
+Listen to voice generation samples created with VibeVoiceFusion. Click the links below to download and play:
 
 ### Single Speaker
 
-**Pandora's Box Story (BFloat16 Model)**
-<audio controls>
-  <source src="demo/outputs/1p_pandora_box_bf16.wav" type="audio/wav">
-  Your browser does not support the audio element.
-</audio>
+**🎧 [Pandora's Box Story (BFloat16 Model)](https://raw.githubusercontent.com/zhao-kun/VibeVoiceFusion/main/demo/outputs/1p_pandora_box_bf16.wav)**
 
 *Generated with bfloat16 precision model - Full quality, 14GB VRAM*
 
-**Pandora's Box Story (Float8 Model)**
-<audio controls>
-  <source src="demo/outputs/1p_pandora_box_float8_e4m3fn.wav" type="audio/wav">
-  Your browser does not support the audio element.
-</audio>
+**🎧 [Pandora's Box Story (Float8 Model)](https://raw.githubusercontent.com/zhao-kun/VibeVoiceFusion/main/demo/outputs/1p_pandora_box_float8_e4m3fn.wav)**
 
 *Generated with float8 quantization - Optimized for 7GB VRAM with comparable quality*
 
 ### Multi-Speaker (3 Speakers)
 
-**东邪西毒 - 西游版 (Journey to the West Version)**
-<audio controls>
-  <source src="demo/outputs/东邪西毒-西游版.wav" type="audio/wav">
-  Your browser does not support the audio element.
-</audio>
+**🎭 [东邪西毒 - 西游版 (Journey to the West Version)](https://raw.githubusercontent.com/zhao-kun/VibeVoiceFusion/main/demo/outputs/东邪西毒-西游版.wav)**
 
 *Multi-speaker dialog with distinct voice characteristics for each character*
 
