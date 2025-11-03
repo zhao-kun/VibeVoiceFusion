@@ -235,7 +235,7 @@ The project will be automatically selected and you'll be navigated to the Speake
 Upload reference voice samples for each speaker. The system supports various audio formats (WAV, MP3, M4A, FLAC, WebM).
 
 <div align="center">
-<img src="docs/images/speak-role-eng.png" alt="Speaker Management" width="700"/>
+<img src="docs/images/speaker-role-eng.png" alt="Speaker Management" width="700"/>
 <p><i>Upload and manage voice samples for each speaker</i></p>
 </div>
 
@@ -320,6 +320,11 @@ Configure generation parameters and start the voice synthesis process. Monitor r
 - Phase indicators: Preprocessing → Inferencing → Saving
 - Live token generation count
 - Estimated time remaining
+
+<div align="center">
+<img src="docs/images/generating-voice-eng.png" alt="Voice Generation" width="700"/>
+<p><i>Generation interface with parameters, live progress, and history</i></p>
+</div>
 
 **Generation History:**
 - View all past generations with status (completed, failed, running)

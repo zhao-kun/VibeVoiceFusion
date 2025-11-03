@@ -326,6 +326,11 @@ Speaker 1: 让我们深入探讨今天的话题。
 - 实时 token 生成计数
 - 估计剩余时间
 
+<div align="center">
+<img src="docs/images/generating-voice-eng.png" alt="Voice Generation" width="700"/>
+<p><i>Generation interface with parameters, live progress, and history</i></p>
+</div>
+
 **生成历史：**
 - 查看所有过往生成及其状态（已完成、失败、运行中）
 - 按日期、状态或会话筛选和排序
