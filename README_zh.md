@@ -15,7 +15,7 @@
 
 [English](README.md) | [简体中文](README_zh.md)
 
-[功能特性](#功能特性) • [快速开始](#快速开始) • [文档](#文档) • [社区](#社区) • [贡献](#贡献)
+[功能特性](#功能特性) • [演示样本](#演示样本) • [快速开始](#快速开始) • [文档](#文档) • [社区](#社区) • [贡献](#贡献)
 
 </div>
 
@@ -113,6 +113,40 @@ VibeVoice 结合**自回归（AR）**和**扩散**技术进行文本转语音合
 - **Toast 通知**：所有操作的用户友好反馈
 - **深色模式就绪**：现代化一致的样式
 - **可访问性**：键盘导航和 ARIA 标签
+
+---
+
+## 演示样本
+
+试听使用 VibeVoiceFusion 生成的语音样本。点击播放按钮收听效果：
+
+### 单说话人
+
+**潘多拉魔盒故事（BFloat16 模型）**
+<audio controls>
+  <source src="demo/outputs/1p_pandora_box_bf16.wav" type="audio/wav">
+  您的浏览器不支持音频播放。
+</audio>
+
+*使用 bfloat16 精度模型生成 - 完整质量，需要 14GB 显存*
+
+**潘多拉魔盒故事（Float8 模型）**
+<audio controls>
+  <source src="demo/outputs/1p_pandora_box_float8_e4m3fn.wav" type="audio/wav">
+  您的浏览器不支持音频播放。
+</audio>
+
+*使用 float8 量化生成 - 优化至 7GB 显存，质量相当*
+
+### 多说话人（3 个说话人）
+
+**东邪西毒 - 西游版**
+<audio controls>
+  <source src="demo/outputs/东邪西毒-西游版.wav" type="audio/wav">
+  您的浏览器不支持音频播放。
+</audio>
+
+*多说话人对话，每个角色具有独特的声音特征*
 
 ---
 

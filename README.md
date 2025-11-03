@@ -15,7 +15,7 @@
 
 [English](README.md) | [简体中文](README_zh.md)
 
-[Features](#features) • [Get Started](#get-started) • [Documentation](#documentation) • [Community](#community) • [Contributing](#contributing)
+[Features](#features) • [Demo Samples](#demo-samples) • [Get Started](#get-started) • [Documentation](#documentation) • [Community](#community) • [Contributing](#contributing)
 
 </div>
 
@@ -111,6 +111,40 @@ VibeVoice combines **autoregressive (AR)** and **diffusion** techniques for text
 - **Toast Notifications**: User-friendly feedback for all operations
 - **Dark Mode Ready**: Modern UI with consistent styling
 - **Accessibility**: Keyboard navigation and ARIA labels
+
+---
+
+## Demo Samples
+
+Listen to voice generation samples created with VibeVoiceFusion. Click the play button to hear the results:
+
+### Single Speaker
+
+**Pandora's Box Story (BFloat16 Model)**
+<audio controls>
+  <source src="demo/outputs/1p_pandora_box_bf16.wav" type="audio/wav">
+  Your browser does not support the audio element.
+</audio>
+
+*Generated with bfloat16 precision model - Full quality, 14GB VRAM*
+
+**Pandora's Box Story (Float8 Model)**
+<audio controls>
+  <source src="demo/outputs/1p_pandora_box_float8_e4m3fn.wav" type="audio/wav">
+  Your browser does not support the audio element.
+</audio>
+
+*Generated with float8 quantization - Optimized for 7GB VRAM with comparable quality*
+
+### Multi-Speaker (3 Speakers)
+
+**东邪西毒 - 西游版 (Journey to the West Version)**
+<audio controls>
+  <source src="demo/outputs/东邪西毒-西游版.wav" type="audio/wav">
+  Your browser does not support the audio element.
+</audio>
+
+*Multi-speaker dialog with distinct voice characteristics for each character*
 
 ---
 
