@@ -2,6 +2,8 @@
 
 <div align="center">
 
+<img src="frontend/public/icon-rect-pulse.svg" alt="VibeVoice Logo" width="120"/>
+
 **A Complete Web Application for Multi-Speaker Voice Generation**
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)

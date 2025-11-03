@@ -2,6 +2,8 @@
 
 <div align="center">
 
+<img src="frontend/public/icon-rect-pulse.svg" alt="VibeVoice Logo" width="120"/>
+
 **完整的多说话人语音生成 Web 应用**
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
