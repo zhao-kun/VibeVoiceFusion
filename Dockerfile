@@ -19,8 +19,8 @@ RUN pip install --no-cache-dir huggingface-hub[cli]
 WORKDIR /tmp/models
 
 # Download model (float8_e4m3fn only) using huggingface-cli
-RUN huggingface-cli download zhaokun/vibevoice-large \
-    vibvoice7b_float8_e4m3fn.safetensors \
+RUN hf download zhaokun/vibevoice-large \
+    vibevoice7b_float8_e4m3fn.safetensors \
     --local-dir /tmp/models/VibeVoice-large
 
 #############################################
