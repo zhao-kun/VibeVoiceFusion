@@ -158,7 +158,8 @@
     "formatLabel": "格式：",
     "formatLine1": "说话人名称：对话内容",
     "formatLine2": "对话之间用空行分隔",
-    "formatLine3": "准备用于 VibeVoice 处理"
+    "formatLine3": "准备用于 VibeVoice 处理",
+    "clearConfirm": "确定要清空所有对话行吗？此操作无法撤销。"
   },
   "generation": {
     "title": "语音生成",

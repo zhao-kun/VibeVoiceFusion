@@ -158,7 +158,8 @@
     "formatLabel": "Format:",
     "formatLine1": "Speaker Name: Dialog content",
     "formatLine2": "Empty line between dialogs",
-    "formatLine3": "Ready for VibeVoice processing"
+    "formatLine3": "Ready for VibeVoice processing",
+    "clearConfirm": "Are you sure you want to clear all dialog lines? This action cannot be undone."
   },
   "generation": {
     "title": "Voice Generation",

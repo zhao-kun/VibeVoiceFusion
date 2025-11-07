@@ -33,6 +33,7 @@ export default function DialogEditor({
   const { t } = useLanguage();
   const [viewMode, setViewMode] = useState<'visual' | 'text'>('visual');
   const [textContent, setTextContent] = useState('');
+  const [showClearDialog, setShowClearDialog] = useState(false);
 
   const getSpeakerById = (speakerId: string) => {
     return speakers.find((s) => s.id === speakerId);
@@ -144,7 +145,7 @@ export default function DialogEditor({
               </span>
             )}
             <button
-              onClick={onClear}
+              onClick={() => setShowClearDialog(true)}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
             >
               {t('common.clear')}
@@ -264,6 +265,33 @@ export default function DialogEditor({
           </div>
         )}
       </div>
+
+      {/* Clear Confirmation Dialog */}
+      {showClearDialog && (
+        <div className="fixed inset-0 bg-gray-900/50 flex items-center justify-center z-[200] p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-gray-900">{t('common.confirm')}</h3>
+            <p className="text-gray-600 mb-4">{t('voiceEditor.clearConfirm')}</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowClearDialog(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={() => {
+                  onClear();
+                  setShowClearDialog(false);
+                }}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
+              >
+                {t('common.clear')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
