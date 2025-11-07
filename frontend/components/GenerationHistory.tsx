@@ -221,8 +221,18 @@ function GenerationHistory() {
             <p className="text-sm font-mono text-gray-900 break-all">{generation.request_id}</p>
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600">{t('generation.sessionId')}</label>
-            <p className="text-sm text-gray-900">{generation.session_id}</p>
+            <label className="text-xs font-medium text-gray-600 block">{t('generation.sessionName')}</label>
+            {(generation.session_name === t('session.deleted') || generation.session_name === t('session.unknown')) ? (
+              <p className="text-sm text-gray-400 italic">{generation.session_name}</p>
+            ) : (
+              <a
+                href={`/voice-editor?session=${generation.session_id}`}
+                className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block"
+                title={t('generation.sessionId') + ': ' + generation.session_id}
+              >
+                {generation.session_name}
+              </a>
+            )}
           </div>
         </div>
 

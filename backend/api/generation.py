@@ -2,6 +2,7 @@
 Generation API endpoints
 """
 from uuid import uuid4
+from typing import Dict, Any
 from flask import request, jsonify, current_app, send_file
 from backend.api import api_bp
 from backend.models.generation import Generation
@@ -15,6 +16,36 @@ from transformers.utils import logging
 
 logging.set_verbosity_info()
 logger = logging.get_logger(__name__)
+
+
+def _enrich_generation_with_session_name(generation: Generation, dialog_service: DialogSessionService) -> Dict[str, Any]:
+    """
+    Enrich generation dict with session_name field.
+
+    If session is not found (deleted), returns a placeholder.
+
+    Args:
+        generation: Generation object
+        dialog_service: DialogSessionService to look up session
+
+    Returns:
+        Generation dict with session_name added
+    """
+    gen_dict = generation.to_dict()
+
+    # Try to get session name
+    try:
+        session = dialog_service.get_session(generation.session_id)
+        if session:
+            gen_dict['session_name'] = session.name
+        else:
+            # Session was deleted
+            gen_dict['session_name'] = t('session.deleted')
+    except Exception as e:
+        logger.warning(f"Failed to get session name for session_id {generation.session_id}: {e}")
+        gen_dict['session_name'] = t('session.deleted')
+
+    return gen_dict
 
 
 def _validate_offloading_config(offloading: dict) -> dict:
@@ -118,7 +149,10 @@ def get_voice_generation_service(project_id: str):
         speaker_service = SpeakerService(project_path / 'voices')
         dialog_service = DialogSessionService(project_path / 'scripts', speaker_service=speaker_service)
         # Return dialog session service for project's scripts directory
-        service = VoiceGenerationService(project_path / 'output', speaker_service=speaker_service, dialog_service=dialog_service)
+        service = VoiceGenerationService(project_path / 'output',
+                                         speaker_service=speaker_service,
+                                         dialog_service=dialog_service,
+                                         fake_model=current_app.config.get('FAKE_MODEL', False))
 
         generation: Generation = service.generation(dialog_session_id,
                                                     request_id,
@@ -136,7 +170,7 @@ def get_voice_generation_service(project_id: str):
         return jsonify({
             'message': t('success.generation_started'),
             'request_id': generation.request_id,
-            'generation': generation.to_dict()
+            'generation': _enrich_generation_with_session_name(generation, dialog_service)
         }), 200
     except Exception as e:
         logger.error(f"Error occurred while starting voice generation: {e}")
@@ -162,9 +196,31 @@ def get_current_generation():
             'generation': None
         }), 200
 
+    # Enrich with session name
+    try:
+        if generation.project_id:
+            project_service = ProjectService(workspace_dir=current_app.config['WORKSPACE_DIR'],
+                                           meta_file_name=current_app.config['PROJECTS_META_FILE'])
+            project_path = project_service.get_project_path(generation.project_id)
+
+            if project_path:
+                speaker_service = SpeakerService(project_path / 'voices')
+                dialog_service = DialogSessionService(project_path / 'scripts', speaker_service=speaker_service)
+                gen_dict = _enrich_generation_with_session_name(generation, dialog_service)
+            else:
+                gen_dict = generation.to_dict()
+                gen_dict['session_name'] = t('session.deleted')
+        else:
+            gen_dict = generation.to_dict()
+            gen_dict['session_name'] = t('session.unknown')
+    except Exception as e:
+        logger.warning(f"Failed to enrich current generation with session name: {e}")
+        gen_dict = generation.to_dict()
+        gen_dict['session_name'] = t('session.unknown')
+
     return jsonify({
         'message': 'Current generation status retrieved successfully',
-        'generation': generation.to_dict()
+        'generation': gen_dict
     }), 200
 
 @api_bp.route('/projects/<project_id>/generations', methods=['GET'])
@@ -198,9 +254,12 @@ def get_all_generations(project_id):
 
         generations = service.list_generations()
 
+        # Enrich all generations with session names
+        enriched_generations = [_enrich_generation_with_session_name(g, dialog_service) for g in generations]
+
         return jsonify({
-            'generations': [g.to_dict() for g in generations],
-            'count': len(generations)
+            'generations': enriched_generations,
+            'count': len(enriched_generations)
         }), 200
 
     except Exception as e:
@@ -316,7 +375,7 @@ def get_generation(project_id: str, request_id: str):
             }), 404
 
         return jsonify({
-            'generation': generation.to_dict()
+            'generation': _enrich_generation_with_session_name(generation, dialog_service)
         }), 200
 
     except Exception as e:

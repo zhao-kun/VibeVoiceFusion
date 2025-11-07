@@ -69,8 +69,9 @@ class InferenceBase(ABC):
 
     @staticmethod
     def create(generation: Generation, speaker_service: SpeakerService,
-               dialog_service: DialogSessionService, meta_file_path: str, fake: bool = False,
-               offload_config: Optional[Dict[str, Any]] = None) -> 'InferenceBase':
+               dialog_service: DialogSessionService, meta_file_path: str,
+               offload_config: Optional[Dict[str, Any]] = None,
+               fake: bool = False) -> 'InferenceBase':
         """
         Create inference engine instance.
 

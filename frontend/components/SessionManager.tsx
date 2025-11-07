@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/SessionContext";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import toast from "react-hot-toast";
 
 export default function SessionManager() {
+  const router = useRouter();
   const { sessions, currentSession, selectSession, createSession, deleteSession, updateSession, loading, error } = useSession();
   const { t } = useLanguage();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -109,7 +111,7 @@ export default function SessionManager() {
           return (
             <div
               key={session.id}
-              onClick={() => selectSession(session.id)}
+              onClick={() => router.push(`/voice-editor?session=${session.id}`)}
               className={`
                 p-3 mb-2 rounded-lg cursor-pointer transition-all duration-150
                 ${

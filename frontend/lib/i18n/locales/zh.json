@@ -87,6 +87,8 @@
     "speakerCount": "个说话人"
   },
   "session": {
+    "deleted": "已删除的会话",
+    "unknown": "未知会话",
     "title": "对话会话",
     "createSession": "创建会话",
     "sessionName": "会话名称",
@@ -316,6 +318,7 @@
     "created": "创建时间",
     "updated": "更新时间",
     "session": "会话",
+    "sessionName": "会话名称",
     "hide": "隐藏"
   },
   "errors": {

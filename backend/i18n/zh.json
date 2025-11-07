@@ -47,6 +47,10 @@
     "completed": "已完成",
     "failed": "失败"
   },
+  "session": {
+    "deleted": "已删除的会话",
+    "unknown": "未知会话"
+  },
   "validation": {
     "required_field": "{field} 为必填项",
     "invalid_format": "{field} 格式无效",

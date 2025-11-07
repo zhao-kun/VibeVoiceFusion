@@ -47,6 +47,10 @@
     "completed": "Completed",
     "failed": "Failed"
   },
+  "session": {
+    "deleted": "Deleted Session",
+    "unknown": "Unknown Session"
+  },
   "validation": {
     "required_field": "{field} is required",
     "invalid_format": "Invalid {field} format",

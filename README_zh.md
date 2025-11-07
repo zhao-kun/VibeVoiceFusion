@@ -122,11 +122,11 @@ VibeVoice 结合**自回归（AR）**和**扩散**技术进行文本转语音合
 
 ### 单说话人
 
-**🎧 [潘多拉魔盒故事（BFloat16 模型）](https://raw.githubusercontent.com/zhao-kun/VibeVoiceFusion/main/demo/outputs/1p_pandora_box_bf16.wav)**
+**🎧 [大话西游（BFloat16 模型）](https://raw.githubusercontent.com/zhao-kun/VibeVoiceFusion/main/demo/outputs/1p_pandora_box_bf16.wav)**
 
 *使用 bfloat16 精度模型生成 - 完整质量，需要 14GB 显存*
 
-**🎧 [潘多拉魔盒故事（Float8 模型）](https://raw.githubusercontent.com/zhao-kun/VibeVoiceFusion/main/demo/outputs/1p_pandora_box_float8_e4m3fn.wav)**
+**🎧 [大话西游（Float8 模型）](https://raw.githubusercontent.com/zhao-kun/VibeVoiceFusion/main/demo/outputs/1p_pandora_box_float8_e4m3fn.wav)**
 
 *使用 float8 量化生成 - 优化至 7GB 显存，质量相当*
 

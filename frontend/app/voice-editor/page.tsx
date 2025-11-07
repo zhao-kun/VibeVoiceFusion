@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import SpeakerSelector from "@/components/SpeakerSelector";
 import DialogEditor from "@/components/DialogEditor";
 import DialogPreview from "@/components/DialogPreview";
@@ -15,9 +15,10 @@ import toast from "react-hot-toast";
 
 function VoiceEditorContent() {
   const { currentProject } = useProject();
-  const { currentSession, updateSessionDialogs } = useSession();
+  const { currentSession, updateSessionDialogs, selectSession } = useSession();
   const { speakerRoles } = useSpeakerRole();
   const { t } = useLanguage();
+  const searchParams = useSearchParams();
   const [dialogLines, setDialogLines] = useState<DialogLine[]>([]);
   const [selectedSpeakerId, setSelectedSpeakerId] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -39,6 +40,17 @@ function VoiceEditorContent() {
       setSelectedSpeakerId(speakers[0].id);
     }
   }, [speakers, selectedSpeakerId]);
+
+  // Handle session query parameter - URL is the source of truth
+  useEffect(() => {
+    const sessionId = searchParams.get('session');
+    if (sessionId && currentSession?.id !== sessionId) {
+      selectSession(sessionId).catch((error) => {
+        console.error('Failed to select session from URL:', error);
+        toast.error(t('session.loadError'));
+      });
+    }
+  }, [searchParams, selectSession, currentSession?.id, t]);
 
   // Load dialog lines from current session (only when session ID changes)
   useEffect(() => {
@@ -198,7 +210,16 @@ export default function VoiceEditorPage() {
     <div className="h-full flex flex-col">
       {showContent ? (
         <SpeakerRoleProvider projectId={currentProject.id}>
-          <VoiceEditorContent />
+          <Suspense fallback={
+            <div className="flex-1 flex items-center justify-center bg-gray-50">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-500">{t('voiceEditor.loadingProject')}</p>
+              </div>
+            </div>
+          }>
+            <VoiceEditorContent />
+          </Suspense>
         </SpeakerRoleProvider>
       ) : (
         <>

@@ -34,6 +34,8 @@ class Config:
     RATELIMIT_ENABLED = os.environ.get('RATELIMIT_ENABLED', 'true').lower() == 'true'
     RATELIMIT_DEFAULT = os.environ.get('RATELIMIT_DEFAULT', '100 per hour')
 
+    FAKE_MODEL = os.environ.get('FAKE_MODEL', 'false').lower() == 'true'
+
 
 class DevelopmentConfig(Config):
     """Development configuration"""

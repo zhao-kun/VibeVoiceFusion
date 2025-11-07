@@ -26,6 +26,7 @@ export type ModelDtype = 'bf16' | 'float8_e4m3fn';
 export interface Generation {
   request_id: string;
   session_id: string;
+  session_name: string;
   status: InferencePhase;
   output_filename: string | null;
   percentage: number | null;

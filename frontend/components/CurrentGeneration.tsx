@@ -280,10 +280,20 @@ function CurrentGeneration() {
           <p className="text-lg font-semibold">{getStatusLabel(currentGeneration.status)}</p>
         </div>
 
-        {/* Session ID */}
+        {/* Session Name */}
         <div>
-          <label className="text-sm font-medium opacity-75">{t('generation.sessionId')}</label>
-          <p className="text-sm">{currentGeneration.session_id}</p>
+          <label className="text-sm font-medium opacity-75 block">{t('generation.sessionName')}</label>
+          {(currentGeneration.session_name === t('session.deleted') || currentGeneration.session_name === t('session.unknown')) ? (
+            <p className="text-sm text-white opacity-75 italic">{currentGeneration.session_name}</p>
+          ) : (
+            <a
+              href={`/voice-editor?session=${currentGeneration.session_id}`}
+              className="text-sm hover:underline cursor-pointer block"
+              title={t('generation.sessionId') + ': ' + currentGeneration.session_id}
+            >
+              {currentGeneration.session_name}
+            </a>
+          )}
         </div>
 
         {/* Request ID */}

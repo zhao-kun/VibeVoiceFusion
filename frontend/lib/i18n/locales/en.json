@@ -87,6 +87,8 @@
     "speakerCount": "speakers"
   },
   "session": {
+    "deleted": "Deleted Session",
+    "unknown": "Unknown Session",
     "title": "Dialog Sessions",
     "createSession": "Create Session",
     "sessionName": "Session Name",
@@ -316,6 +318,7 @@
     "created": "Created",
     "updated": "Updated",
     "session": "Session",
+    "sessionName": "Session Name",
     "hide": "Hide"
   },
   "errors": {

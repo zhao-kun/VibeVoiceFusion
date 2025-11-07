@@ -12,7 +12,7 @@ class VoiceGenerationService:
 
     GENERATION_META_FILE = 'generation.json'
 
-    def __init__(self, project_generation_dir: Path, speaker_service: SpeakerService, dialog_service: DialogSessionService):
+    def __init__(self, project_generation_dir: Path, speaker_service: SpeakerService, dialog_service: DialogSessionService, fake_model: bool = False):
         """
         Initialize voice generation service for a specific project
 
@@ -28,6 +28,7 @@ class VoiceGenerationService:
 
         self.speaker_service = speaker_service
         self.dialog_service = dialog_service
+        self.fake_model = fake_model
 
         # Initialize metadata file if it doesn't exist
         if not self.meta_file_path.exists():
@@ -184,7 +185,8 @@ class VoiceGenerationService:
 
         inference = InferenceBase.create(generation, self.speaker_service,
                                          self.dialog_service, self.meta_file_path,
-                                         offload_config=offloading_config)
+                                         offload_config=offloading_config,
+                                         fake=self.fake_model)
 
         task = Task.from_inference(inference=inference,
                                    file_handler=self.file_handler,
