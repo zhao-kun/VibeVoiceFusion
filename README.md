@@ -192,7 +192,7 @@ Download from HuggingFace (choose one):
 - **BFloat16 (Full Precision)**: [vibevoice7b_bf16.safetensors](https://huggingface.co/zhaokun/vibevoice-large/blob/main/vibevoice7b_bf16.safetensors) (~14GB)
 - **Config**: [config.json](https://huggingface.co/zhaokun/vibevoice-large/blob/main/config.json)
 
-Place files in `./models/converted/`
+Place files in `./models/vibevoice/`
 
 **3. Install Frontend Dependencies** (for development)
 
@@ -362,7 +362,7 @@ For CLI-based generation without the web UI:
 
 ```bash
 python demo/local_file_inference.py \
-    --model_file ./models/converted/vibevoice7b_float8_e4m3fn.safetensors \
+    --model_file ./models/vibevoice/vibevoice7b_float8_e4m3fn.safetensors \
     --txt_path demo/text_examples/1p_pandora_box.txt \
     --speaker_names zh-007 \
     --output_dir ./outputs \

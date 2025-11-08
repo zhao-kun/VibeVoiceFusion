@@ -195,7 +195,7 @@ pip install -e .
 - **BFloat16（全精度）**：[vibevoice7b_bf16.safetensors](https://huggingface.co/zhaokun/vibevoice-large/blob/main/vibevoice7b_bf16.safetensors)（约 14GB）
 - **配置文件**：[config.json](https://huggingface.co/zhaokun/vibevoice-large/blob/main/config.json)
 
-将文件放置在 `./models/converted/` 目录
+将文件放置在 `./models/vibevoice/` 目录
 
 **3. 安装前端依赖**（用于开发）
 
@@ -367,7 +367,7 @@ Speaker 1: 让我们深入探讨今天的话题。
 
 ```bash
 python demo/local_file_inference.py \
-    --model_file ./models/converted/vibevoice7b_float8_e4m3fn.safetensors \
+    --model_file ./models/vibevoice/vibevoice7b_float8_e4m3fn.safetensors \
     --txt_path demo/text_examples/1p_pandora_box.txt \
     --speaker_names zh-007 \
     --output_dir ./outputs \
