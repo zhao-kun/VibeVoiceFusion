@@ -90,6 +90,8 @@ VibeVoice combines **autoregressive (AR)** and **diffusion** techniques for text
 | Aggressive | 8 | 5-7GB | 0.55x | RTX 3060 12GB |
 | Extreme | 4 | 4-5GB | 0.40x | RTX 3060 8GB |
 
+> Float8 Quantization only supports by RTX 40XX or 50XX serial nvidia card.
+
 #### Internationalization
 
 - **Full Bilingual Support**: Complete English/Chinese UI with 360+ translation keys
@@ -172,7 +174,7 @@ docker run -d \
 
 Access the application at `http://localhost:9527`
 
-The Docker image is available on Docker Hub, and you can launch VibeVoiceFusion using the following command.
+**The Docker image is available on Docker Hub, and you can launch VibeVoiceFusion using the following command.**
 
 ```bash
 docker pull zhaokundev/vibevoicefusion

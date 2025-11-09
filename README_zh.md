@@ -92,6 +92,8 @@ VibeVoice 结合**自回归（AR）**和**扩散**技术进行文本转语音合
 | 激进 | 8 | 5-7GB | 0.55x | RTX 3060 12GB |
 | 极限 | 4 | 4-5GB | 0.40x | RTX 3060 8GB |
 
+> Float8 量化，只有RTX 40系及以上显卡支持。
+
 #### 国际化
 
 - **完整双语支持**：完整的英文/中文界面，360+ 翻译键
@@ -175,7 +177,7 @@ docker run -d \
 
 在 `http://localhost:9527` 访问应用
 
-Docker 镜像已经上传至Docker Hub， 你可以通过如下的命令直接启动vibevoicefusion 服务。
+**Docker 镜像已经上传至Docker Hub， 你可以通过如下的命令直接启动vibevoicefusion 服务。**
 
 ```bash
 docker pull zhaokundev/vibevoicefusion
