@@ -1,0 +1,17 @@
+services:
+  model-downloader:
+    build:
+      target: model-downloader
+      context: .
+    image: vibevoicefusion:model-downloader
+  vibevoice:
+    build:
+      context: .
+      target: builder
+      args:
+        BASE_IMAGE: nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
+        WORKDIR: /workspace/zhao-kun/vibevoice
+        GITHUB_REPO: https://github.com/zhao-kun/vibevoicefusion.git
+        GITHUB_BRANCH: main
+    image: vibevoicefusion:latest
+

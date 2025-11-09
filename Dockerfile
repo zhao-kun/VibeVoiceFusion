@@ -23,6 +23,10 @@ RUN hf download zhaokun/vibevoice-large \
     vibevoice7b_float8_e4m3fn.safetensors \
     --local-dir /tmp/models/VibeVoice-large
 
+RUN hf download zhaokun/vibevoice-large \
+    vibevoice7b_bf16.safetensors \
+    --local-dir /tmp/models/VibeVoice-large
+
 #############################################
 # Stage 2: Clone Repository and Build Frontend
 #############################################
@@ -53,21 +57,37 @@ RUN ls -la out/
 #############################################
 # Stage 3: Create Python Virtual Environment
 #############################################
-FROM ${BASE_IMAGE} AS python-builder
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04 AS python-builder
 
 ARG WORKDIR=/workspace/zhao-kun/vibevoice
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3.10-venv \
-    python3.10-dev \
-    python3-pip \
-    build-essential \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update --allow-releaseinfo-change --yes && \
+    apt-get upgrade --yes && \
+    apt install --yes --no-install-recommends \
+    bash \
+    libgl1 \
+    software-properties-common \
+    ffmpeg \
+    zip \
+    unzip \
+    iputils-ping \
+    libtcmalloc-minimal4 \
+    net-tools \
+    vim \
+    p7zip-full && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN add-apt-repository ppa:deadsnakes/ppa
+
+RUN apt-get update --allow-releaseinfo-change --yes && \
+    apt install python3.10-dev python3.10-venv python3-pip \
+    build-essential git curl -y --no-install-recommends && \
+    ln -s /usr/bin/python3.10 /usr/bin/python && \
+    rm /usr/bin/python3 && \
+    ln -s /usr/bin/python3.10 /usr/bin/python3 && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    echo "en_US.UTF-8 UTF-8" > /etc/locale.gen
 
 # Create working directory at EXACT runtime path
 RUN mkdir -p ${WORKDIR}
@@ -88,19 +108,39 @@ RUN rm -rf ${WORKDIR}/frontend
 #############################################
 # Stage 4: Final Image
 #############################################
-FROM ${BASE_IMAGE}
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04 AS builder
 
 ARG WORKDIR=/workspace/zhao-kun/vibevoice
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
-# Install runtime dependencies only
-RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3.10-venv \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update --allow-releaseinfo-change --yes && \
+    apt-get upgrade --yes && \
+    apt install --yes --no-install-recommends \
+    bash \
+    libgl1 \
+    software-properties-common \
+    ffmpeg \
+    zip \
+    unzip \
+    iputils-ping \
+    libtcmalloc-minimal4 \
+    net-tools \
+    vim \
+    p7zip-full && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN add-apt-repository ppa:deadsnakes/ppa
+
+RUN apt-get update --allow-releaseinfo-change --yes && \
+    apt install python3.10-dev python3.10-venv python3-pip \
+    build-essential git curl -y --no-install-recommends && \
+    ln -s /usr/bin/python3.10 /usr/bin/python && \
+    rm /usr/bin/python3 && \
+    ln -s /usr/bin/python3.10 /usr/bin/python3 && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    echo "en_US.UTF-8 UTF-8" > /etc/locale.gen
+
 
 # Copy downloaded model from model-downloader stage
 RUN mkdir -p /tmp/models/
@@ -112,7 +152,8 @@ WORKDIR ${WORKDIR}
 # Copy virtual environment from python-builder stage (with preserved absolute paths)
 COPY --from=python-builder ${WORKDIR} .
 
-RUN mkdir -p ${WORKDIR}/backend/models/  && ln -s /tmp/models/vibvoice7b_float8_e4m3fn.safetensors ${WORKDIR}/backend/models/
+RUN mkdir -p ${WORKDIR}/models/vibevoice/  && ln -s /tmp/models/vibevoice7b_float8_e4m3fn.safetensors ${WORKDIR}/models/vibevoice/
+RUN mkdir -p ${WORKDIR}/models/vibevoice/  && ln -s /tmp/models/vibevoice7b_bf16.safetensors ${WORKDIR}/models/vibevoice/
 
 # Copy frontend build from source-and-frontend stage
 RUN mkdir -p ${WORKDIR}/backend/dist
@@ -130,3 +171,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Use venv python explicitly (critical - do not rely on PATH)
 CMD ["/workspace/zhao-kun/vibevoice/venv/bin/python", "backend/run.py"]
+
