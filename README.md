@@ -30,7 +30,7 @@ VibeVoiceFusion is a **web application** for generating high-quality, multi-spea
 **Key Goals:**
 - Provide a user-friendly interface for voice generation without requiring coding knowledge
 - Enable efficient multi-speaker dialog synthesis with distinct voice characteristics
-- Optimize memory usage for consumer-grade GPUs (8GB+ VRAM)
+- Optimize memory usage for consumer-grade GPUs (10GB+ VRAM)
 - Support bilingual workflows (English/Chinese)
 - Offer both web UI and CLI interfaces for different use cases
 
@@ -75,10 +75,10 @@ VibeVoice combines **autoregressive (AR)** and **diffusion** techniques for text
 #### VRAM Optimization
 
 - **Layer Offloading**: Move transformer layers between CPU/GPU to reduce VRAM requirements
-  - **Balanced** (12 GPU / 16 CPU layers): ~5GB VRAM savings, ~2.0x slower - RTX 3060 12GB, 4070
-  - **Aggressive** (8 GPU / 20 CPU layers): ~6GB VRAM savings, ~2.5x slower - RTX 3060 8GB, 4060
-  - **Extreme** (4 GPU / 24 CPU layers): ~7GB VRAM savings, ~3.5x slower - RTX 3060 6GB (minimum)
-- **Float8 Quantization**: Reduce model size from ~14GB to ~7GB with comparable quality
+  - **Balanced** (12 GPU / 16 CPU layers): ~5GB VRAM savings, ~2.0x slower - RTX 3060 16GB, 4070
+  - **Aggressive** (8 GPU / 20 CPU layers): ~6GB VRAM savings, ~2.5x slower - RTX 3060 12GB, 4060
+  - **Extreme** (4 GPU / 24 CPU layers): ~7GB VRAM savings, ~3.5x slower - RTX 3060 10GB (minimum)
+- **Float8 Quantization**: Reduce model size from ~14GB to ~7GB with comparable quality. (Supported by RTX 40 series and above graphics cards.)
 - **Adaptive Configuration**: Automatic VRAM estimation and optimal layer distribution
 
 **VRAM Requirements:**
@@ -86,9 +86,9 @@ VibeVoice combines **autoregressive (AR)** and **diffusion** techniques for text
 | Configuration | GPU Layers | VRAM Usage | Speed | Target Hardware |
 |--------------|-----------|------------|-------|-----------------|
 | No offloading | 28 | 11-14GB | 1.0x | RTX 4090, A100, 3090 |
-| Balanced | 12 | 6-8GB | 0.70x | RTX 4070, 3080 12GB |
+| Balanced | 12 | 6-8GB | 0.70x | RTX 4070, 3080 16GB |
 | Aggressive | 8 | 5-7GB | 0.55x | RTX 3060 12GB |
-| Extreme | 4 | 4-5GB | 0.40x | RTX 3060 8GB |
+| Extreme | 4 | 4-5GB | 0.40x | RTX 3080 10GB |
 
 > Float8 Quantization only supports by RTX 40XX or 50XX serial nvidia card.
 
@@ -204,7 +204,7 @@ pip install -e .
 **2. Download Pre-trained Model**
 
 Download from HuggingFace (choose one):
-- **Float8 (Recommended)**: [vibevoice7b_float8_e4m3fn.safetensors](https://huggingface.co/zhaokun/vibevoice-large/blob/main/vibevoice7b_float8_e4m3fn.safetensors) (~7GB)
+- **Float8 (Recommended)**: [vibevoice7b_float8_e4m3fn.safetensors](https://huggingface.co/zhaokun/vibevoice-large/blob/main/vibevoice7b_float8_e4m3fn.safetensors) (~7GB) (Supported by RTX 40 series and above graphics cards.)
 - **BFloat16 (Full Precision)**: [vibevoice7b_bf16.safetensors](https://huggingface.co/zhaokun/vibevoice-large/blob/main/vibevoice7b_bf16.safetensors) (~14GB)
 - **Config**: [config.json](https://huggingface.co/zhaokun/vibevoice-large/blob/main/config.json)
 
@@ -348,9 +348,9 @@ Configure generation parameters and start the voice synthesis process. Monitor r
     - Default: 1.3
   - **Random Seed**: Any positive integer for reproducibility
   - **Offloading** (optional): Enable if VRAM < 14GB
-    - **Balanced**: 12 GPU layers, ~5GB savings, 2.0x slower (RTX 3060 12GB, 4070)
-    - **Aggressive**: 8 GPU layers, ~6GB savings, 2.5x slower (RTX 3060 8GB)
-    - **Extreme**: 4 GPU layers, ~7GB savings, 3.5x slower (minimum 6GB VRAM)
+    - **Balanced**: 12 GPU layers, ~5GB savings, 2.0x slower (RTX 3070 12GB, 4070)
+    - **Aggressive**: 8 GPU layers, ~6GB savings, 2.5x slower (RTX 3080 12GB)
+    - **Extreme**: 4 GPU layers, ~7GB savings, 3.5x slower (minimum 10GB VRAM)
 - Click "Start Generation"
 
 **Real-Time Monitoring:**
