@@ -172,6 +172,18 @@ docker run -d \
 
 Access the application at `http://localhost:9527`
 
+The Docker image is available on Docker Hub, and you can launch VibeVoiceFusion using the following command.
+
+```bash
+docker pull zhaokundev/vibevoicefusion
+docker run -d \
+  --name vibevoicefusion \
+  --gpus all \
+  -p 9527:9527 \
+  -v $(pwd)/workspace:/workspace/zhao-kun/vibevoice/workspace \
+  zhaokundev/vibevoicefusion:latest
+```
+
 **Build Time**: 18-28 minutes | **Image Size**: ~12-15GB
 
 #### Option 2: Manual Installation

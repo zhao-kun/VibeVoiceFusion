@@ -13,5 +13,5 @@ services:
         WORKDIR: /workspace/zhao-kun/vibevoice
         GITHUB_REPO: https://github.com/zhao-kun/vibevoicefusion.git
         GITHUB_BRANCH: main
-    image: vibevoicefusion:latest
+    image: zhaokundev/vibevoicefusion:latest
 

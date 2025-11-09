@@ -170,10 +170,22 @@ docker run -d \
   --gpus all \
   -p 9527:9527 \
   -v $(pwd)/workspace:/workspace/zhao-kun/vibevoice/workspace \
-  vibevoice:latest
+  zhaokundev/vibevoicefusion:latest
 ```
 
 在 `http://localhost:9527` 访问应用
+
+Docker 镜像已经上传至Docker Hub， 你可以通过如下的命令直接启动vibevoicefusion 服务。
+
+```bash
+docker pull zhaokundev/vibevoicefusion
+docker run -d \
+  --name vibevoicefusion \
+  --gpus all \
+  -p 9527:9527 \
+  -v $(pwd)/workspace:/workspace/zhao-kun/vibevoice/workspace \
+  zhaokundev/vibevoicefusion:latest
+```
 
 **构建时间**：18-28 分钟 | **镜像大小**：约 12-15GB
 
