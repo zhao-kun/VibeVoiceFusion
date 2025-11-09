@@ -150,22 +150,24 @@ Listen to voice generation samples created with VibeVoiceFusion. Click the links
 
 #### Option 1: Docker (Recommended for Production)
 
+Build docker image 
 ```bash
 # Clone the repository
-git clone https://github.com/zhao-kun/vibevoice.git
-cd vibevoice
+git clone https://github.com/zhao-kun/vibevoicefusion.git
+cd vibevoicefusion
+# Build and the docker image
+docker compose build vibevoice
+```
 
-# Build and run with Docker Compose
-docker-compose up -d --build
+After build successfully, run command:
 
-# Or use Docker CLI
-docker build -t vibevoice:latest .
+```bash
 docker run -d \
-  --name vibevoice \
+  --name vibevoicefusion \
   --gpus all \
   -p 9527:9527 \
   -v $(pwd)/workspace:/workspace/zhao-kun/vibevoice/workspace \
-  vibevoice:latest
+  zhaokundev/vibevoicefusion:latest
 ```
 
 Access the application at `http://localhost:9527`

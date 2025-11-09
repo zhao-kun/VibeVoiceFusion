@@ -152,16 +152,19 @@ VibeVoice 结合**自回归（AR）**和**扩散**技术进行文本转语音合
 
 #### 方式 1：Docker（生产环境推荐）
 
+构建Docker镜像
 ```bash
 # 克隆仓库
-git clone https://github.com/zhao-kun/vibevoice.git
-cd vibevoice
+git clone https://github.com/zhao-kun/vibevoicefusion.git
+cd vibevoicefusion
 
 # 使用 Docker Compose 构建和运行
-docker-compose up -d --build
+docker compose build vibevoice
+```
 
-# 或使用 Docker CLI
-docker build -t vibevoice:latest .
+运行Docker 容器
+
+```bash
 docker run -d \
   --name vibevoice \
   --gpus all \
