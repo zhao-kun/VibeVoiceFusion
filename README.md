@@ -12,6 +12,9 @@
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 [![TypeScript](https://img.shields.io/badge/typescript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](Dockerfile)
+[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-vibevoicefussion-blue?logo=docker)](https://hub.docker.com/r/zhaokundev/vibevoicefusion)
+[![Docker Pulls](https://img.shields.io/docker/pulls/zhaokundev/vibevoicefusion)](https://hub.docker.com/r/zhaokundev/vibevoicefusion)
+[![Image Size](https://img.shields.io/docker/image-size/zhaokundev/vibevoicefusion/latest)](https://hub.docker.com/r/zhaokundev/vibevoicefusion)
 
 [English](README.md) | [简体中文](README_zh.md)
 
