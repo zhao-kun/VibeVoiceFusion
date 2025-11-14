@@ -40,7 +40,10 @@ RUN apk add --no-cache git
 
 # Clone repository
 WORKDIR /build
-RUN git clone --depth 1 --branch ${GITHUB_BRANCH} ${GITHUB_REPO} vibevoice
+RUN git clone --depth 1 --branch ${GITHUB_BRANCH} ${GITHUB_REPO} vibevoice && \
+    cd /build/vibevoice && \
+    git checkout main && \
+    git rev-parse HEAD > backend/version.txt
 
 # Build frontend
 WORKDIR /build/vibevoice/frontend
