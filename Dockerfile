@@ -34,9 +34,13 @@ FROM node:20-alpine AS source-and-frontend
 
 ARG GITHUB_REPO
 ARG GITHUB_BRANCH
+ARG CACHE_BUST=unknown
 
 # Install git
 RUN apk add --no-cache git
+
+# Cache bust: Force rebuild from here when CACHE_BUST changes
+RUN echo "Cache bust: ${CACHE_BUST}"
 
 # Clone repository
 WORKDIR /build

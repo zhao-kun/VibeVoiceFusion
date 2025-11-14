@@ -4,6 +4,13 @@ services:
       target: model-downloader
       context: .
     image: vibevoicefusion:model-downloader
+  backend-builder:
+    build:
+      target: python-builder
+      context: .
+      args:
+        CACHE_BUST: ${CACHE_BUST:-unknown}
+    image: vibevoicefusion:python-builder
   vibevoice:
     build:
       context: .
@@ -13,5 +20,6 @@ services:
         WORKDIR: /workspace/zhao-kun/vibevoice
         GITHUB_REPO: https://github.com/zhao-kun/vibevoicefusion.git
         GITHUB_BRANCH: main
+        CACHE_BUST: ${CACHE_BUST:-unknown}
     image: zhaokundev/vibevoicefusion:latest
 
