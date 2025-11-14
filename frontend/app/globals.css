@@ -24,3 +24,69 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Fix text input visibility in dark mode */
+@media (prefers-color-scheme: dark) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  textarea,
+  select {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+  }
+
+  input[type="text"]::placeholder,
+  input[type="number"]::placeholder,
+  input[type="email"]::placeholder,
+  input[type="password"]::placeholder,
+  input[type="search"]::placeholder,
+  input[type="tel"]::placeholder,
+  input[type="url"]::placeholder,
+  textarea::placeholder {
+    color: #6b7280 !important;
+  }
+
+  /* Disabled inputs should still look disabled */
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    background-color: #f3f4f6 !important;
+    color: #9ca3af !important;
+  }
+
+  /* Fix headings and text on white/light backgrounds in dark mode */
+  .bg-white h1,
+  .bg-white h2,
+  .bg-white h3,
+  .bg-white h4,
+  .bg-white h5,
+  .bg-white h6,
+  .bg-white p,
+  .bg-white span,
+  .bg-white div,
+  .bg-white label {
+    color: #1f2937 !important;
+  }
+
+  /* Preserve intentional color classes */
+  .bg-white .text-red-500,
+  .bg-white .text-red-600,
+  .bg-white .text-red-700,
+  .bg-white .text-red-800,
+  .bg-white .text-blue-500,
+  .bg-white .text-blue-600,
+  .bg-white .text-blue-700,
+  .bg-white .text-green-500,
+  .bg-white .text-green-600,
+  .bg-white .text-green-700,
+  .bg-white .text-yellow-500,
+  .bg-white .text-yellow-600,
+  .bg-white .text-yellow-700 {
+    color: inherit !important;
+  }
+}
