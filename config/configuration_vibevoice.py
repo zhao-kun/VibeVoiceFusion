@@ -334,6 +334,73 @@ class VibeVoiceConfig:
             **main_config
         )
 
+class VibeVoiceStreamingConfig:
+    """Configuration for the VibeVoice Realtime (streaming) model."""
+    model_type = "vibevoice_streaming"
+    is_composition = True
+    is_encoder_decoder = False
+    sub_configs = {
+        "acoustic_tokenizer_config": VibeVoiceAcousticTokenizerConfig,
+        "decoder_config": QwenConfig,
+        "diffusion_head_config": VibeVoiceDiffusionHeadConfig,
+    }
+
+    def __init__(
+        self,
+        acoustic_tokenizer_config=None,
+        decoder_config=None,
+        diffusion_head_config=None,
+        tts_backbone_num_hidden_layers: int = 20,
+        **kwargs
+    ):
+        kwargs["_attn_implementation_autoset"] = False
+
+        if acoustic_tokenizer_config is None:
+            self.acoustic_tokenizer_config = VibeVoiceAcousticTokenizerConfig()
+        elif isinstance(acoustic_tokenizer_config, dict):
+            acoustic_tokenizer_config["model_type"] = "vibevoice_acoustic_tokenizer"
+            self.acoustic_tokenizer_config = VibeVoiceAcousticTokenizerConfig(**acoustic_tokenizer_config)
+        elif isinstance(acoustic_tokenizer_config, VibeVoiceAcousticTokenizerConfig):
+            self.acoustic_tokenizer_config = acoustic_tokenizer_config
+
+        if decoder_config is None:
+            self.decoder_config = QwenConfig()
+        elif isinstance(decoder_config, dict):
+            if decoder_config.get("model_type", '') == "qwen2":
+                self.decoder_config = QwenConfig(**decoder_config)
+            else:
+                raise ValueError(f"Unsupported decoder model type: {decoder_config.get('model_type', '')}")
+        elif isinstance(decoder_config, QwenConfig):
+            self.decoder_config = decoder_config
+
+        if diffusion_head_config is None:
+            self.diffusion_head_config = VibeVoiceDiffusionHeadConfig()
+        elif isinstance(diffusion_head_config, dict):
+            diffusion_head_config["model_type"] = "vibevoice_diffusion_head"
+            self.diffusion_head_config = VibeVoiceDiffusionHeadConfig(**diffusion_head_config)
+        elif isinstance(diffusion_head_config, VibeVoiceDiffusionHeadConfig):
+            self.diffusion_head_config = diffusion_head_config
+
+        self.acoustic_vae_dim = getattr(self.acoustic_tokenizer_config, 'vae_dim', 64)
+        self.tts_backbone_num_hidden_layers = tts_backbone_num_hidden_layers
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    @classmethod
+    def from_dict(cls, config_dict: Dict, **kwargs):
+        """Create a VibeVoiceStreamingConfig from a config.json dictionary."""
+        sub_keys = ["acoustic_tokenizer_config", "decoder_config", "diffusion_head_config"]
+        main_config = {k: v for k, v in config_dict.items() if k not in sub_keys}
+        main_config.update(kwargs)
+
+        return cls(
+            acoustic_tokenizer_config=config_dict.get("acoustic_tokenizer_config", None),
+            decoder_config=config_dict.get("decoder_config", None),
+            diffusion_head_config=config_dict.get("diffusion_head_config", None),
+            **main_config
+        )
+
 _default_config_json = """
 {
   "acostic_vae_dim": 64,
@@ -462,5 +529,6 @@ __all__ = [
     "VibeVoiceAcousticTokenizerConfig",
     "VibeVoiceSemanticTokenizerConfig",
     "VibeVoiceDiffusionHeadConfig",
-    "VibeVoiceConfig"
+    "VibeVoiceConfig",
+    "VibeVoiceStreamingConfig",
 ]
