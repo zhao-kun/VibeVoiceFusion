@@ -165,6 +165,23 @@ Speech-to-text backed by VibeVoice-ASR. Accepts `multipart/form-data` (same as O
 
 See [APIs.md](APIs.md#2-create-transcription) for full request/response examples.
 
+### `WS /v1/realtime` — Realtime Transcription
+
+Live speech-to-text over the OpenAI Realtime WebSocket protocol, used by the Live Transcription pages for microphone input. Both client dialects are accepted: GA `session.update` with `session.type: "transcription"` and beta `transcription_session.update`. Input must be base64 PCM16, 24 kHz, mono (`audio/pcm` / `pcm16`).
+
+**How it maps onto VibeVoice-ASR:** VibeVoice-ASR is not a streaming model, so the server re-transcribes a rolling window of the most recent uncommitted audio (at least 1 s, every ≥0.5 s of new audio, at most 30 s). Segments that come out identical in two consecutive passes, or that are followed by trailing silence, are committed: each becomes one conversation item (`input_audio_buffer.committed` → `...transcription.delta` → `...transcription.completed`) and the window moves past it. Windows without speech are skipped without running the model.
+
+**Differences from OpenAI:**
+- `turn_detection` (server VAD / semantic VAD) and `noise_reduction` are not supported and are reported as `null`; segmentation comes from the rolling window.
+- `...transcription.completed` carries an extra `segment` field with absolute `start_time` / `end_time` and `speaker_id`.
+- Extension events: `vibevoice.transcription.hypothesis` (uncommitted draft), `vibevoice.session.status` (model loading, listening, finishing, saved) and the client event `vibevoice.session.finish`.
+- Deltas are text that has stayed stable across passes, so they arrive in bursts rather than token by token.
+- The session holds the single GPU task slot for its whole duration; connecting while the slot is busy returns `error.code: "server_busy"` and closes with `1013`.
+- Every session is saved to transcription history with `source: "live"` (standalone, or a project via the `project_id` query parameter).
+- Browsers pass the API key as the subprotocol `openai-insecure-api-key.<key>`, as OpenAI's own browser clients do.
+
+See [APIs.md](APIs.md#3-realtime-transcription-websocket) for the full event reference, close codes and configuration.
+
 ### `GET /v1/models` — List Available Models
 
 Returns a list of available models in OpenAI-compatible format.
@@ -194,6 +211,11 @@ This endpoint does not require authentication.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OPENAI_COMPAT_API_KEY` | *(not set)* | API key for Bearer token auth. When unset, all requests are allowed without authentication. |
+| `STREAMING_ASR_MAX_SESSION_SECONDS` | 1800 | Realtime transcription: audio length that ends a session |
+| `STREAMING_ASR_IDLE_TIMEOUT_SECONDS` | 60 | Realtime transcription: finish after this long without client messages |
+| `STREAMING_ASR_MAX_WINDOW_SECONDS` | 30 | Realtime transcription: longest window re-transcribed per pass |
+| `STREAMING_ASR_SILENCE_COMMIT_SECONDS` | 1.0 | Realtime transcription: trailing silence that commits the window |
+| `STREAMING_ASR_SILENCE_RMS` | 0.008 | Realtime transcription: RMS level treated as silence |
 
 ### Server-Side Constants
 
@@ -378,5 +400,6 @@ await fs.promises.writeFile("output.wav", buffer);
 - **`instructions` parameter not supported** — this is an OpenAI GPT-4o-mini-tts-only feature
 - **No billing/usage tracking** — no token counting or usage metering
 - **Extension parameters not yet wired** — `seeds`, `cfg_scale`, `offloading` in request body are currently ignored (reserved for future implementation)
-- **Transcriptions: no `srt` / `vtt` output, no streaming, no language detection** — see the transcriptions section above
+- **Transcriptions: no `srt` / `vtt` output, no `stream=true` on `/v1/audio/transcriptions`, no language detection** — see the transcriptions section above; live input is supported through `/v1/realtime` instead
+- **Realtime: transcription sessions only** — no conversation/response sessions, no server VAD, 24 kHz PCM16 input only
 - **Non-wav format conversion requires ffmpeg** — if `ffmpeg` is not installed, requesting `mp3`, `flac`, `opus`, `aac`, or `pcm` formats will return `500`

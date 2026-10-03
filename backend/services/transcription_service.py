@@ -1,6 +1,7 @@
 """
 Transcription Service - ASR transcription for standalone use and inside projects
 """
+from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from uuid import uuid4
@@ -9,7 +10,11 @@ from utils.file_handler import FileHandler
 from backend.models.transcription import Transcription
 from backend.task_manager.task import gm
 from backend.task_manager.asr_task import ASRTask
+from backend.task_manager.streaming_asr_task import StreamingASRTask
 from backend.inference.asr_inference import ASRInferenceBase
+from backend.inference.streaming_asr_inference import (
+    StreamingASRSession, STREAMING_MAX_NEW_TOKENS, create_streaming_engine,
+)
 from util.logger import get_logger
 
 logger = get_logger(__name__)
@@ -144,6 +149,55 @@ class TranscriptionService:
         self._delete_audio_if_unused(audio_file, [])
         return None
 
+    def start_live_transcription(self, session: StreamingASRSession,
+                                 limits: Dict[str, float],
+                                 model_dtype: str = "bf16",
+                                 seeds: int = 42,
+                                 offloading_config: Optional[Dict[str, Any]] = None) -> Optional[Transcription]:
+        """
+        Start a live transcription that runs until the session finishes; its audio is saved as WAV at the end.
+
+        Returns:
+            Transcription object if started, None if task manager is busy
+        """
+        audio_file = f"{uuid4().hex}.wav"
+        transcription = Transcription.create(
+            request_id=uuid4().hex,
+            audio_file=audio_file,
+            original_filename=f"live-{datetime.now().strftime('%Y%m%d-%H%M%S')}.wav",
+            project_id=self.project_id,
+            context_info=session.context_info,
+            model_dtype=model_dtype,
+            max_new_tokens=STREAMING_MAX_NEW_TOKENS,
+            seeds=seeds,
+            offloading=offloading_config,
+            source="live",
+        )
+
+        inference = create_streaming_engine(
+            transcription=transcription,
+            audio_path=str(self.audio_dir / audio_file),
+            session=session,
+            limits=limits,
+            offload_config=offloading_config,
+            fake=self.fake_model,
+        )
+        task = StreamingASRTask.from_inference(
+            inference=inference,
+            file_handler=self.file_handler,
+            history_file_path=str(self.history_file),
+        )
+
+        history = self._load_history()
+        history.insert(0, transcription.to_dict())
+        self._save_history(history)
+
+        if gm.add_task(task):
+            return transcription
+
+        self._save_history([h for h in self._load_history() if h.get('request_id') != transcription.request_id])
+        return None
+
     def get_transcription(self, request_id: str) -> Optional[Transcription]:
         """Get a transcription, preferring the live state of the running task"""
         current = self._current_transcription()
@@ -177,6 +231,7 @@ class TranscriptionService:
                 'text_preview': record.text_preview,
                 'segment_count': len(record.segments),
                 'model_dtype': record.model_dtype,
+                'source': record.source,
                 'created_at': record.created_at,
                 'completed_at': record.completed_at,
             })

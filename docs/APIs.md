@@ -18,7 +18,7 @@ http://localhost:9527/api/v1
 6. [Generation API](#generation-api)
 7. [Quick Generate API](#quick-generate-api)
 8. [Transcription API](#transcription-api)
-9. [OpenAI-Compatible TTS API](#openai-compatible-tts-api) (speech and transcriptions)
+9. [OpenAI-Compatible TTS API](#openai-compatible-tts-api) (speech, transcriptions and [realtime transcription over WebSocket](#3-realtime-transcription-websocket))
 10. [Dataset Management API](#dataset-management-api)
 11. [Training Management API](#training-management-api)
 
@@ -1546,7 +1546,8 @@ A transcription is only visible in the scope it was created in. Project-scoped e
   "error_message": null,
   "created_at": "2026-10-03T10:00:00",
   "updated_at": "2026-10-03T10:00:31",
-  "completed_at": "2026-10-03T10:00:31"
+  "completed_at": "2026-10-03T10:00:31",
+  "source": "file"
 }
 ```
 
@@ -1557,6 +1558,7 @@ A transcription is only visible in the scope it was created in. Project-scoped e
 | `reach_max_new_tokens` | `true` if decoding stopped at `max_new_tokens`; the transcript may be truncated |
 | `raw_text` | Decoded model output before parsing |
 | `segments` | Parsed segments; empty if the model output could not be parsed |
+| `source` | `"file"` for uploaded audio, `"live"` for sessions recorded through the [realtime WebSocket](#3-realtime-transcription-websocket). A live record's `original_filename` is `live-YYYYmmdd-HHMMSS.wav`, its `segments` carry absolute session timestamps, and its audio file is written when the session ends |
 
 ### Status Values
 
@@ -1685,7 +1687,8 @@ Lists transcription summaries, newest first.
       "segment_count": 12,
       "model_dtype": "bf16",
       "created_at": "2026-10-03T10:00:00",
-      "completed_at": "2026-10-03T10:00:31"
+      "completed_at": "2026-10-03T10:00:31",
+      "source": "file"
     }
   ],
   "count": 1,
@@ -1808,7 +1811,7 @@ workspace/
 
 ## Overview
 
-VibeVoice provides an OpenAI-compatible Text-to-Speech endpoint at `POST /v1/audio/speech`, enabling existing OpenAI TTS clients and SDKs to use VibeVoice as a drop-in replacement. A speech-to-text endpoint at `POST /v1/audio/transcriptions` is backed by VibeVoice-ASR (see [Create Transcription](#2-create-transcription)).
+VibeVoice provides an OpenAI-compatible Text-to-Speech endpoint at `POST /v1/audio/speech`, enabling existing OpenAI TTS clients and SDKs to use VibeVoice as a drop-in replacement. A speech-to-text endpoint at `POST /v1/audio/transcriptions` is backed by VibeVoice-ASR (see [Create Transcription](#2-create-transcription)), and live microphone transcription is available over the Realtime WebSocket protocol at `/v1/realtime` (see [Realtime Transcription](#3-realtime-transcription-websocket)).
 
 **Base URL:** `http://localhost:9527/v1` (note: `/v1`, not `/api/v1`)
 
@@ -2004,7 +2007,110 @@ with open("meeting.wav", "rb") as f:
 print(result.text)
 ```
 
-### 3. List Models
+### 3. Realtime Transcription (WebSocket)
+
+**WebSocket** `ws://localhost:9527/v1/realtime`
+
+Live transcription of a continuous 24 kHz audio stream using the OpenAI Realtime transcription protocol. The Live Transcription pages (`/live-transcribe`, `/live-transcription`) use this endpoint. The server re-transcribes a rolling window of recent audio with VibeVoice-ASR, commits segments once they stop changing, and streams the results back.
+
+**Connection:**
+
+| Item | Value |
+|------|-------|
+| Subprotocol | `realtime` (the server echoes it; browsers fail the handshake otherwise) |
+| Authentication | `Authorization: Bearer <key>`, or for browsers the extra subprotocol `openai-insecure-api-key.<key>`. Only checked when `OPENAI_COMPAT_API_KEY` is set |
+| `project_id` (query, VibeVoice extension) | Save the session into this project's transcription history instead of the standalone one |
+| `offloading` (query, VibeVoice extension) | Layer offloading preset: `balanced`, `aggressive` or `extreme` |
+
+The session holds the GPU task slot from the first `session.update` / `input_audio_buffer.append` until it ends, so no other generation, training or transcription can start meanwhile. While it runs, `GET /api/v1/tasks/current` reports it as a `transcription` task with `source: "live"`.
+
+**Client events:**
+
+| Event | Description |
+|-------|-------------|
+| `session.update` (GA) | `session.type` must be `"transcription"`. `session.audio.input.format` must be `{"type": "audio/pcm", "rate": 24000}` if given. `session.audio.input.transcription.model` selects the precision (`vibevoice-asr` → bf16, `vibevoice-asr-fp8` → float8_e4m3fn, `whisper-1` → bf16, unknown → bf16); `prompt` is used as `context_info`. Replies `session.updated` |
+| `transcription_session.update` (beta) | Same, with `input_audio_format: "pcm16"` and `input_audio_transcription: {model, prompt}`. Replies `transcription_session.updated` |
+| `input_audio_buffer.append` | `audio`: base64 PCM16, 24 kHz, mono, little-endian |
+| `input_audio_buffer.commit` | Transcribe and commit everything received so far |
+| `input_audio_buffer.clear` | Drop uncommitted audio. Replies `input_audio_buffer.cleared` |
+| `vibevoice.session.finish` (extension) | Stop accepting audio, transcribe the rest, save the record and close the socket |
+
+`turn_detection` is not supported and is reported as `null`; segmentation is done by the rolling window instead.
+
+**Server events:**
+
+| Event | Description |
+|-------|-------------|
+| `session.created` | Sent on connect (GA shape) |
+| `input_audio_buffer.committed` | A new item starts: `item_id`, `previous_item_id` |
+| `conversation.item.input_audio_transcription.delta` | Append-only text of the item: the prefix that stayed identical across passes |
+| `conversation.item.input_audio_transcription.completed` | Final `transcript` of the item, plus an extension field `segment` (`start_time`, `end_time` in seconds from session start, `speaker_id`, `text`) |
+| `vibevoice.transcription.hypothesis` (extension) | Current uncommitted draft: `item_id`, `text`, `segments`, `committed_until` (seconds). Replaced by the next hypothesis; may still change |
+| `vibevoice.session.status` (extension) | `status`: `loading_model`, `listening`, `stopping`, `finalizing`, `completed`, `failed`; with `request_id` of the saved transcription, and `reason` (`client_request`, `idle_timeout`, `max_duration`) or `error` |
+| `error` | `error.type`, `error.code`, `error.message` |
+
+One item corresponds to one committed ASR segment. A segment is committed when it is unchanged in two consecutive passes, after `STREAMING_ASR_SILENCE_COMMIT_SECONDS` of trailing silence, on `input_audio_buffer.commit`, when the window reaches `STREAMING_ASR_MAX_WINDOW_SECONDS`, or when the session finishes.
+
+**Example session:**
+```
+→ {"type": "session.update", "session": {"type": "transcription", "audio": {"input": {"format": {"type": "audio/pcm", "rate": 24000}, "transcription": {"model": "vibevoice-asr", "prompt": "VibeVoice"}}}}}
+← {"type": "session.updated", ...}
+← {"type": "vibevoice.session.status", "status": "loading_model", "request_id": "5f0c..."}
+← {"type": "vibevoice.session.status", "status": "listening", "request_id": "5f0c..."}
+→ {"type": "input_audio_buffer.append", "audio": "<base64 pcm16>"}   (repeated)
+← {"type": "vibevoice.transcription.hypothesis", "item_id": null, "text": "Hello every", "segments": [...], "committed_until": 0.0}
+← {"type": "input_audio_buffer.committed", "item_id": "item_000001", "previous_item_id": null}
+← {"type": "conversation.item.input_audio_transcription.delta", "item_id": "item_000001", "content_index": 0, "delta": "Hello everyone."}
+← {"type": "conversation.item.input_audio_transcription.completed", "item_id": "item_000001", "content_index": 0, "transcript": "Hello everyone.", "segment": {"start_time": 0.0, "end_time": 1.8, "speaker_id": 0, "text": "Hello everyone."}}
+→ {"type": "vibevoice.session.finish"}
+← {"type": "vibevoice.session.status", "status": "stopping", "request_id": "5f0c...", "reason": "client_request"}
+← {"type": "vibevoice.session.status", "status": "finalizing", "request_id": "5f0c..."}
+← {"type": "vibevoice.session.status", "status": "completed", "request_id": "5f0c..."}
+(server closes the socket)
+```
+
+**Saving:** every session that received audio is stored as a transcription with `source: "live"` (standalone history, or the project's when `project_id` is given). This also happens when the client disconnects without `vibevoice.session.finish`, after `STREAMING_ASR_IDLE_TIMEOUT_SECONDS` without client messages, or when the session reaches `STREAMING_ASR_MAX_SESSION_SECONDS`.
+
+**Errors and close codes:**
+
+| `error.code` | Close code | When |
+|--------------|------------|------|
+| `invalid_api_key` | 1008 | API key required and missing or wrong |
+| `project_not_found` | 1008 | Unknown `project_id` |
+| `invalid_offloading` | 1008 | Unknown `offloading` preset |
+| `server_busy` | 1013 at connect, 1000 if the slot was taken before the session started | Another GPU task is running |
+| `unsupported_audio_format`, `unsupported_session_type`, `missing_audio`, `invalid_audio`, `invalid_json`, `invalid_message`, `unknown_event` | - | Rejected client event; the session continues |
+| `server_error` type | 1000 | Transcription failed; followed by `vibevoice.session.status` `failed` |
+
+**Configuration (environment variables):**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `STREAMING_ASR_MAX_SESSION_SECONDS` | 1800 | Audio length after which the session finishes (`reason: max_duration`) |
+| `STREAMING_ASR_IDLE_TIMEOUT_SECONDS` | 60 | Finish when no client message arrives for this long |
+| `STREAMING_ASR_MAX_WINDOW_SECONDS` | 30 | Longest window re-transcribed per pass |
+| `STREAMING_ASR_SILENCE_COMMIT_SECONDS` | 1.0 | Trailing silence that commits the window |
+| `STREAMING_ASR_SILENCE_RMS` | 0.008 | RMS level below which audio counts as silence |
+
+```python
+import asyncio, base64, json, websockets
+
+async def main(pcm16_24k: bytes):
+    async with websockets.connect("ws://localhost:9527/v1/realtime", subprotocols=["realtime"]) as ws:
+        await ws.send(json.dumps({"type": "session.update", "session": {"type": "transcription"}}))
+        for i in range(0, len(pcm16_24k), 4800):
+            await ws.send(json.dumps({"type": "input_audio_buffer.append",
+                                      "audio": base64.b64encode(pcm16_24k[i:i + 4800]).decode()}))
+        await ws.send(json.dumps({"type": "vibevoice.session.finish"}))
+        async for message in ws:
+            event = json.loads(message)
+            if event["type"] == "conversation.item.input_audio_transcription.completed":
+                print(event["transcript"])
+```
+
+---
+
+### 4. List Models
 
 **GET** `/v1/models`
 

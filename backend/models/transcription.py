@@ -49,6 +49,7 @@ class Transcription:
     details: Optional[TranscriptionDetails] = None
     error_message: Optional[str] = None
     completed_at: Optional[str] = None
+    source: str = "file"  # "file" for uploads, "live" for streaming sessions
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -70,7 +71,8 @@ class Transcription:
                top_p: float = 1.0,
                repetition_penalty: float = 1.0,
                seeds: int = 42,
-               offloading: Optional[Dict[str, Any]] = None) -> 'Transcription':
+               offloading: Optional[Dict[str, Any]] = None,
+               source: str = "file") -> 'Transcription':
         """Create a new pending transcription request"""
         now = datetime.utcnow().isoformat()
         return cls(
@@ -90,6 +92,7 @@ class Transcription:
             context_info=context_info,
             offloading=offloading,
             details=TranscriptionDetails(offloading_config=offloading or {}),
+            source=source,
         )
 
 

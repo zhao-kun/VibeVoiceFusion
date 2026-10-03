@@ -46,7 +46,7 @@ import type {
   TranscriptFormat,
 } from '@/types/transcription';
 
-import type { OffloadingConfig } from '@/types/generation';
+import type { OffloadingConfig, OffloadingPreset } from '@/types/generation';
 
 // API base URL configuration
 // Development: Full URL to backend server (different origin)
@@ -1212,6 +1212,23 @@ class ApiClient {
    */
   getTranscriptionDownloadUrl(projectId: string | null, requestId: string, format: TranscriptFormat): string {
     return `${this.baseUrl}${this.transcriptionBase(projectId)}/${encodeURIComponent(requestId)}/download?format=${format}`;
+  }
+
+  /**
+   * WebSocket URL of the OpenAI-compatible realtime transcription endpoint (/v1/realtime)
+   */
+  getRealtimeTranscriptionUrl(projectId: string | null, offloading?: OffloadingPreset): string {
+    // The realtime endpoint lives at /v1 next to /api/v1, and the Next dev proxy does not forward WebSockets
+    const httpBase = new URL(this.baseUrl.replace(/\/api\/v1\/?$/, '') || '/', window.location.href);
+    httpBase.protocol = httpBase.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = new URL(`${httpBase.pathname.replace(/\/$/, '')}/v1/realtime`, httpBase);
+    if (projectId) {
+      url.searchParams.set('project_id', projectId);
+    }
+    if (offloading) {
+      url.searchParams.set('offloading', offloading);
+    }
+    return url.toString();
   }
 }
 

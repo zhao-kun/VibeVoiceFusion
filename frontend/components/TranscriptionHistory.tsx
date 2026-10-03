@@ -195,7 +195,14 @@ export default function TranscriptionHistory({ projectId, onSelect, currentId, c
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium text-gray-900 truncate">{item.original_filename}</p>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{item.original_filename}</p>
+                        {item.source === 'live' && (
+                          <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-rose-100 text-rose-700 flex-shrink-0">
+                            {t('transcription.liveBadge')}
+                          </span>
+                        )}
+                      </div>
                       <span className={`px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0 ${getStatusBadge(item.status)}`}>
                         {t(`transcription.status.${item.status}`)}
                       </span>

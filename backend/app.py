@@ -133,6 +133,8 @@ def register_blueprints(app):
     """Register API blueprints"""
     from backend.api import api_bp
     from backend.api.openai_compat import openai_bp
+    from backend.api.openai_realtime import sock
 
     app.register_blueprint(api_bp, url_prefix='/api/v1')
     app.register_blueprint(openai_bp, url_prefix='/v1')
+    sock.init_app(app)

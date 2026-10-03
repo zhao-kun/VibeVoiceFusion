@@ -29,6 +29,11 @@ export interface TranscriptionDetails {
 }
 
 /**
+ * "file" for uploaded audio, "live" for microphone streaming sessions
+ */
+export type TranscriptionSource = 'file' | 'live';
+
+/**
  * Transcription metadata from backend
  */
 export interface Transcription {
@@ -57,6 +62,7 @@ export interface Transcription {
   details: TranscriptionDetails | null;
   error_message: string | null;
   completed_at: string | null;
+  source?: TranscriptionSource;
 }
 
 /**
@@ -106,6 +112,7 @@ export interface TranscriptionSummary {
   model_dtype: ModelDtype;
   created_at: string;
   completed_at: string | null;
+  source?: TranscriptionSource;
 }
 
 /**
@@ -162,3 +169,43 @@ export function formatTimestamp(seconds: number | null): string {
   const mm = String(minutes).padStart(2, '0');
   return hours > 0 ? `${hours}:${mm}:${secs}` : `${mm}:${secs}`;
 }
+
+/**
+ * Status of a live session, from the `vibevoice.session.status` extension event
+ */
+export type LiveSessionStatus =
+  | 'loading_model'
+  | 'listening'
+  | 'stopping'
+  | 'finalizing'
+  | 'completed'
+  | 'failed';
+
+/**
+ * Server events of the OpenAI Realtime transcription protocol (plus VibeVoice extensions) used by the UI
+ */
+export type RealtimeServerEvent =
+  | { type: 'session.created' | 'session.updated'; session: { id: string } }
+  | { type: 'input_audio_buffer.committed'; item_id: string; previous_item_id: string | null }
+  | { type: 'conversation.item.input_audio_transcription.delta'; item_id: string; delta: string }
+  | {
+      type: 'conversation.item.input_audio_transcription.completed';
+      item_id: string;
+      transcript: string;
+      segment?: TranscriptionSegment;
+    }
+  | {
+      type: 'vibevoice.transcription.hypothesis';
+      item_id: string | null;
+      text: string;
+      segments: TranscriptionSegment[];
+      committed_until: number;
+    }
+  | {
+      type: 'vibevoice.session.status';
+      status: LiveSessionStatus;
+      request_id: string | null;
+      reason?: string;
+      error?: string;
+    }
+  | { type: 'error'; error: { type: string; code?: string; message: string } };

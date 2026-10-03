@@ -230,11 +230,14 @@ export default function TranscriptionWorkspace({
         </div>
 
         <div className="space-y-4">
-          <audio
-            controls
-            src={api.getTranscriptionAudioUrl(projectId, current.request_id)}
-            className="w-full"
-          />
+          {/* A live session writes its audio file only when it ends */}
+          {!(inProgress && current.source === 'live') && (
+            <audio
+              controls
+              src={api.getTranscriptionAudioUrl(projectId, current.request_id)}
+              className="w-full"
+            />
+          )}
 
           {current.context_info && (
             <div className="text-sm">
