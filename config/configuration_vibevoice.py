@@ -401,6 +401,76 @@ class VibeVoiceStreamingConfig:
             **main_config
         )
 
+class VibeVoiceASRConfig:
+    """Configuration for the VibeVoice-ASR model (speech encoders + Qwen decoder, no diffusion head)."""
+    model_type = "vibevoice_asr"
+    is_composition = True
+    is_encoder_decoder = False
+    sub_configs = {
+        "acoustic_tokenizer_config": VibeVoiceAcousticTokenizerConfig,
+        "semantic_tokenizer_config": VibeVoiceSemanticTokenizerConfig,
+        "decoder_config": QwenConfig,
+    }
+
+    def __init__(
+        self,
+        acoustic_tokenizer_config=None,
+        semantic_tokenizer_config=None,
+        decoder_config=None,
+        **kwargs
+    ):
+        kwargs["_attn_implementation_autoset"] = False
+        # The released config.json carries a diffusion_head_config, but the checkpoint has no head weights.
+        kwargs.pop("diffusion_head_config", None)
+
+        if acoustic_tokenizer_config is None:
+            self.acoustic_tokenizer_config = VibeVoiceAcousticTokenizerConfig()
+        elif isinstance(acoustic_tokenizer_config, dict):
+            acoustic_tokenizer_config["model_type"] = "vibevoice_acoustic_tokenizer"
+            self.acoustic_tokenizer_config = VibeVoiceAcousticTokenizerConfig(**acoustic_tokenizer_config)
+        elif isinstance(acoustic_tokenizer_config, VibeVoiceAcousticTokenizerConfig):
+            self.acoustic_tokenizer_config = acoustic_tokenizer_config
+
+        if semantic_tokenizer_config is None:
+            self.semantic_tokenizer_config = VibeVoiceSemanticTokenizerConfig()
+        elif isinstance(semantic_tokenizer_config, dict):
+            semantic_tokenizer_config["model_type"] = "vibevoice_semantic_tokenizer"
+            self.semantic_tokenizer_config = VibeVoiceSemanticTokenizerConfig(**semantic_tokenizer_config)
+        elif isinstance(semantic_tokenizer_config, VibeVoiceSemanticTokenizerConfig):
+            self.semantic_tokenizer_config = semantic_tokenizer_config
+
+        if decoder_config is None:
+            self.decoder_config = QwenConfig()
+        elif isinstance(decoder_config, dict):
+            if decoder_config.get("model_type", '') == "qwen2":
+                self.decoder_config = QwenConfig(**decoder_config)
+            else:
+                raise ValueError(f"Unsupported decoder model type: {decoder_config.get('model_type', '')}")
+        elif isinstance(decoder_config, QwenConfig):
+            self.decoder_config = decoder_config
+
+        acoustic_vae_dim = kwargs.pop("acoustic_vae_dim", None)
+        semantic_vae_dim = kwargs.pop("semantic_vae_dim", None)
+        self.acoustic_vae_dim = acoustic_vae_dim or getattr(self.acoustic_tokenizer_config, 'vae_dim', 64)
+        self.semantic_vae_dim = semantic_vae_dim or getattr(self.semantic_tokenizer_config, 'vae_dim', 128)
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    @classmethod
+    def from_dict(cls, config_dict: Dict, **kwargs):
+        """Create a VibeVoiceASRConfig from a config.json dictionary."""
+        sub_keys = ["acoustic_tokenizer_config", "semantic_tokenizer_config", "decoder_config", "diffusion_head_config"]
+        main_config = {k: v for k, v in config_dict.items() if k not in sub_keys}
+        main_config.update(kwargs)
+
+        return cls(
+            acoustic_tokenizer_config=config_dict.get("acoustic_tokenizer_config", None),
+            semantic_tokenizer_config=config_dict.get("semantic_tokenizer_config", None),
+            decoder_config=config_dict.get("decoder_config", None),
+            **main_config
+        )
+
 _default_config_json = """
 {
   "acostic_vae_dim": 64,
@@ -520,9 +590,105 @@ _default_config_json = """
 }
 """
 
+_default_asr_config_json = """
+{
+  "_attn_implementation_autoset": false,
+  "acoustic_tokenizer_config": {
+    "causal": true,
+    "channels": 1,
+    "conv_bias": true,
+    "conv_norm": "none",
+    "corpus_normalize": 0.0,
+    "decoder_depths": null,
+    "decoder_n_filters": 32,
+    "decoder_ratios": [8, 5, 5, 4, 2, 2],
+    "disable_last_norm": true,
+    "dtype": "bfloat16",
+    "encoder_depths": "3-3-3-3-3-3-8",
+    "encoder_n_filters": 32,
+    "encoder_ratios": [8, 5, 5, 4, 2, 2],
+    "fix_std": 0.5,
+    "layer_scale_init_value": 1e-06,
+    "layernorm": "RMSNorm",
+    "layernorm_elementwise_affine": true,
+    "layernorm_eps": 1e-05,
+    "mixer_layer": "depthwise_conv",
+    "model_type": "vibevoice_acoustic_tokenizer",
+    "pad_mode": "constant",
+    "std_dist_type": "gaussian",
+    "vae_dim": 64,
+    "weight_init_value": 0.01
+  },
+  "acoustic_vae_dim": 64,
+  "architectures": [
+    "VibeVoiceForASRTraining"
+  ],
+  "decoder_config": {
+    "attention_dropout": 0.0,
+    "dtype": "bfloat16",
+    "hidden_act": "silu",
+    "hidden_size": 3584,
+    "initializer_range": 0.02,
+    "intermediate_size": 18944,
+    "layer_types": [
+      "full_attention", "full_attention", "full_attention", "full_attention",
+      "full_attention", "full_attention", "full_attention", "full_attention",
+      "full_attention", "full_attention", "full_attention", "full_attention",
+      "full_attention", "full_attention", "full_attention", "full_attention",
+      "full_attention", "full_attention", "full_attention", "full_attention",
+      "full_attention", "full_attention", "full_attention", "full_attention",
+      "full_attention", "full_attention", "full_attention", "full_attention"
+    ],
+    "max_position_embeddings": 131072,
+    "max_window_layers": 28,
+    "model_type": "qwen2",
+    "num_attention_heads": 28,
+    "num_hidden_layers": 28,
+    "num_key_value_heads": 4,
+    "rms_norm_eps": 1e-06,
+    "rope_scaling": null,
+    "rope_theta": 1000000.0,
+    "sliding_window": null,
+    "use_cache": true,
+    "use_mrope": false,
+    "use_sliding_window": false,
+    "vocab_size": 152064
+  },
+  "dtype": "float32",
+  "model_type": "vibevoice",
+  "semantic_tokenizer_config": {
+    "causal": true,
+    "channels": 1,
+    "conv_bias": true,
+    "conv_norm": "none",
+    "corpus_normalize": 0.0,
+    "disable_last_norm": true,
+    "dtype": "bfloat16",
+    "encoder_depths": "3-3-3-3-3-3-8",
+    "encoder_n_filters": 32,
+    "encoder_ratios": [8, 5, 5, 4, 2, 2],
+    "fix_std": 0,
+    "layer_scale_init_value": 1e-06,
+    "layernorm": "RMSNorm",
+    "layernorm_elementwise_affine": true,
+    "layernorm_eps": 1e-05,
+    "mixer_layer": "depthwise_conv",
+    "model_type": "vibevoice_semantic_tokenizer",
+    "pad_mode": "constant",
+    "std_dist_type": "none",
+    "vae_dim": 128,
+    "weight_init_value": 0.01
+  },
+  "semantic_vae_dim": 128,
+  "transformers_version": "4.57.6"
+}
+"""
+
 import json # noqa F401
 
 DEFAULT_CONFIG = json.loads(_default_config_json)
+# microsoft/VibeVoice-ASR config.json without its unused diffusion_head_config.
+DEFAULT_ASR_CONFIG = json.loads(_default_asr_config_json)
 
 
 __all__ = [
@@ -531,4 +697,5 @@ __all__ = [
     "VibeVoiceDiffusionHeadConfig",
     "VibeVoiceConfig",
     "VibeVoiceStreamingConfig",
+    "VibeVoiceASRConfig",
 ]

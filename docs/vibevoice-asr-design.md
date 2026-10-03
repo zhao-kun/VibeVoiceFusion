@@ -40,8 +40,7 @@ flowchart LR
         direction TB
         sys["system: transcribe to JSON"]
         usr["user: speech_start, speech_pad × N, speech_end,<br/>'This is a 12.34 seconds audio, ...'"]
-        ast["assistant:"]
-        sys --> usr --> ast
+        sys --> usr
     end
 
     audio --> ac
@@ -54,7 +53,7 @@ flowchart LR
 
 - One speech embedding per 3200 samples (7.5 Hz). 60 min of audio is about 27,000 speech positions, inside the 64K context the docs advertise.
 - Audio over 60 s is encoded in 60 s segments with a streaming conv cache. Segmenting avoids the huge intermediate tensors a single 1-hour conv pass would create.
-- Decoding is plain HF `generate`: greedy by default (`temperature=0`), optional sampling and `repetition_penalty`. Upstream defaults to `max_new_tokens=512` in the CLI demo and 8192 in the Gradio demo.
+- Decoding is plain HF `generate`: greedy by default (`temperature=0`), optional sampling and `repetition_penalty`. Upstream's CLI demo now defaults to `max_new_tokens=32768`; this port defaults to 8192.
 - Optional *context info* (hotwords, names, topics) is injected into the user prompt.
 - Upstream declares `transformers>=4.51.3` for the `asr` extra, so 4.51.3 is a supported version and **no dependency upgrade is needed**.
 
@@ -83,7 +82,7 @@ About 80% of the model is already present locally, with FP8 support. The new cod
 |---|---|---|
 | D1 | Plain `nn.Module` model, no `PreTrainedModel` / `GenerationMixin` | Same pattern as the 7B and Realtime models: keeps FP8 / offload / weight loading under our control and decoupled from `transformers` internals. |
 | D2 | Hand-written decode loop (greedy + optional temperature / top-p / repetition penalty) | HF `GenerationMixin` needs `PreTrainedModel`. The loop is small (one prefill, then one token per step) and lets us add `stop_check_fn` and a progress callback like the TTS models. Logits processors come from `transformers.generation` (stable since well before 4.51) so sampling matches upstream. |
-| D3 | Separate `VibeVoiceASRConfig` instead of reusing `VibeVoiceConfig` | The ASR `config.json` has `model_type: "vibevoice"`, same as TTS, but no `diffusion_head_config`. `VibeVoiceConfig` would silently build a default diffusion head, which is wrong. |
+| D3 | Separate `VibeVoiceASRConfig` instead of reusing `VibeVoiceConfig` | The ASR `config.json` has `model_type: "vibevoice"`, same as TTS, and a `diffusion_head_config`, but the checkpoint has no diffusion head weights. `VibeVoiceConfig` would build a diffusion head that cannot be loaded, which is wrong. |
 | D4 | Separate `VibeVoiceASRTextTokenizerFast` | ASR uses different special tokens (`<\|object_ref_start\|>`, `<\|object_ref_end\|>`, `<\|box_start\|>`; pad = `<\|image_pad\|>`) and a chat template. TTS uses `<\|vision_*\|>`. Changing the existing class would change TTS behaviour. Both use the bundled Qwen2.5-7B tokenizer files; upstream's ASR demo hard-codes `Qwen/Qwen2.5-7B`. |
 | D5 | Add `is_final_chunk: bool = False` to the speech-tokenizer **encoder** path (the only edit to existing model code) | Required for audio over 60 s, and identical to upstream's change. With the default `False` every existing call is byte-for-byte unchanged (proved by a test, §8). The alternative (Option B) duplicates about 150 lines of conv-streaming code that would drift from upstream. |
 | D6 | Batch size fixed to 1 | Local `QwenModel` passes `causal_mask=None` and relies on SDPA `is_causal`. That is correct for a prefill on an empty cache followed by single-token steps, which is exactly ASR batch=1. Batch > 1 needs left padding and a real mask; it's not needed for our single-GPU queue. |
@@ -130,8 +129,8 @@ classDiagram
         +dtype
         +device
         +LayerOffloader offloader
-        +encode_speech(speech_tensors, segment_seconds=60.0) Tensor_N_H
-        +generate(input_ids, acoustic_input_mask, speech_tensors, max_new_tokens=8192, temperature=0.0, top_p=1.0, repetition_penalty=1.0, stop_check_fn, token_callback, show_progress_bar) VibeVoiceASROutput
+        +encode_speech(speech_tensors, speech_masks, streaming_segment_duration=60.0) Tensor_N_H
+        +generate(input_ids, acoustic_input_mask, speech_tensors, speech_masks, max_new_tokens=8192, temperature=0.0, top_k=50, top_p=1.0, repetition_penalty=1.0, eos_token_id, stop_check_fn, token_callback, show_progress_bar) VibeVoiceASROutput
         +from_pretrain(model_path, config, device, offload_config, dtype)$
     }
     class VibeVoiceASRModel {
@@ -197,24 +196,25 @@ flowchart TD
     emb --> splice["embeds[acoustic_input_mask] = speech features"]
     enc --> splice
     splice --> prefill["Prefill: language_model(inputs_embeds, DynamicCache)<br/>lm_head on last position only (D7)"]
-    prefill --> pick["Pick next token<br/>greedy, or temperature / top-p /<br/>repetition penalty"]
+    prefill --> pick["Pick next token<br/>greedy, or repetition penalty /<br/>temperature / top-k / top-p"]
     pick --> stop{"EOS, max_new_tokens,<br/>context limit or<br/>stop_check_fn()?"}
     stop -- no --> step["One-token forward with cache<br/>lm_head, token_callback"]
     step --> pick
-    stop -- yes --> result["VibeVoiceASROutput<br/>sequences, generated_ids, text,<br/>reach_max_new_tokens, timing"]
+    stop -- yes --> result["VibeVoiceASROutput<br/>sequences, generated_ids,<br/>reach_max_new_tokens, timing"]
 ```
 
 1. `embeds = embed_tokens(input_ids)`; `embeds[acoustic_input_mask] = encode_speech(...)`.
 2. Prefill: `language_model(inputs_embeds=embeds, past_key_values=DynamicCache())`, then `lm_head` on the **last position only** (D7).
-3. Loop: pick next token (greedy, or temperature / top-p / repetition penalty via `transformers.generation` logits processors) → append → run a one-token forward with the cache.
-4. Stop on EOS (`<|endoftext|>`, plus `<|im_end|>` if the checkpoint's `generation_config.json` lists it, see Q3), on `max_new_tokens`, on context limit, or when `stop_check_fn()` returns `True`.
-5. Return `sequences`, `generated_ids`, `text`, `reach_max_new_tokens`, and timing.
+3. Loop: pick next token (greedy, or sampling) using `transformers.generation` logits processors in HF `generate` order: repetition penalty, then temperature, top-k (HF default 50, which upstream never overrides), top-p → append → run a one-token forward with the cache.
+4. Stop on EOS (`tokenizer.eos_token_id` = `<|endoftext|>`, as upstream passes; the checkpoint has no `generation_config.json`), on `max_new_tokens`, on context limit, or when `stop_check_fn()` returns `True`.
+5. Return `sequences`, `generated_ids`, `reach_max_new_tokens`, and timing. Text decoding is left to `processor.decode(..., skip_special_tokens=True)`.
 
 **`from_pretrain`** (mirrors the 7B / Realtime loaders):
 
 - `init_empty_weights` → load `model.safetensors.index.json` (sharded HF checkpoint) or a single file.
 - `load_state_dict(strict=False, assign=True)` with explicit missing / unexpected key checks (D8).
-- Optional `dtype` cast. FP8 checkpoints load as stored, and FP8 embeddings are converted to bf16 when offloading (same handling as the 7B loader).
+- The `model.acoustic_tokenizer.decoder.*` keys (276, unused by ASR) are dropped before loading.
+- Optional `dtype` cast, applied to the state dict rather than via `model.to(dtype)` so the fp32 RoPE `inv_freq` buffer is not downcast. FP8 checkpoints load as stored, and FP8 embeddings are converted to bf16 when offloading (same handling as the 7B loader).
 - Offload path: put everything except the LM decoder layers on the device, then create `LayerOffloader(language_model=model.model.language_model, ...)`. ASR has no prediction head, so `offload_prediction_head` is ignored.
 
 ### 5.5 `vibevoice/processor/vibevoice_asr_processor.py` — **new**
@@ -222,15 +222,16 @@ flowchart TD
 Port of upstream `VibeVoiceASRProcessor`, restricted to batch 1:
 
 - Audio input: path (`librosa`, D10), `np.ndarray`, or `torch.Tensor`. Mono, 24 kHz, `AudioNormalizer` (existing class) when `normalize_audio`.
-- Prompt: system prompt `"You are a helpful assistant that transcribes audio input into text output in JSON format."` + user turn `<speech_start> <speech_pad>×ceil(len/3200) <speech_end>\nThis is a {dur:.2f} seconds audio, [with extra info: {context}\n\n]please transcribe it with these keys: Start time, End time, Speaker ID, Content` + assistant generation prompt. The text is reproduced **verbatim** from upstream: the model was trained on it.
+- Prompt: system prompt `"You are a helpful assistant that transcribes audio input into text output in JSON format."` + user turn `<speech_start> <speech_pad>×ceil(len/3200) <speech_end>\nThis is a {dur:.2f} seconds audio, [with extra info: {context}\n\n]please transcribe it with these keys: Start time, End time, Speaker ID, Content`. There is **no** assistant generation prompt: upstream accepts an `add_generation_prompt` flag but never forwards it to `apply_chat_template`. The text is reproduced **verbatim** from upstream: the model was trained on it.
 - Returns `input_ids`, `attention_mask`, `acoustic_input_mask`, `speech_tensors`, `speech_masks`.
 - `post_process_transcription(text)`: the upstream JSON extraction (code fence or first bracket match) and key mapping to `start_time / end_time / speaker_id / text`.
-- `speech_tok_compress_ratio` read from `preprocessor_config.json` (upstream class default 320 vs. loader default 3200; the checkpoint value wins).
+- `speech_tok_compress_ratio` read from `preprocessor_config.json` when present; the HF checkpoint ships none, so the loader default 3200 applies.
 
 ### 5.6 Tools
 
-- `demo/asr_inference_from_file.py`: `--model_path`, `--audio_files …`, `--context_info`, `--max_new_tokens`, `--temperature`, `--top_p`, `--repetition_penalty`, `--seed`, `--device`, `--dtype`, `--offload_layers_on_gpu`, `--output_dir`. Prints segments and writes `{name}_asr.json` (raw text + segments + timing).
-- `demo/convert_asr_model.py`: same as `demo/convert_model.py` but for ASR. Converts the HF sharded checkpoint into a mono `vibevoice_asr_{bf16|float8_e4m3fn}.safetensors`. It's a new script because the existing one is hard-wired to `VibeVoiceConfig` / the TTS model, and changing it risks the TTS conversion flow.
+- `demo/asr_inference_from_file.py`: `--model_path`, `--audio_files …`, `--config`, `--context_info`, `--max_new_tokens`, `--temperature`, `--top_k`, `--top_p`, `--repetition_penalty`, `--seed`, `--device`, `--dtype`, `--offload_layers_on_gpu`, `--output_dir`. Prints segments and writes `{name}_asr.json` (raw text + segments + timing).
+- `demo/convert_asr_model.py`: same as `demo/convert_model.py` but for ASR. Converts the HF sharded checkpoint into a mono `vibevoice_asr_{bf16|float8_e4m3fn}.safetensors`. Adds `--device` (default `cpu`; conversion needs no GPU).
+- Both scripts treat `config.json` as optional, like the TTS loaders: when `<model_path>/config.json` is absent they fall back to `DEFAULT_ASR_CONFIG` (the released config without `diffusion_head_config`). An explicit `--config` path must exist. It's a new script because the existing one is hard-wired to `VibeVoiceConfig` / the TTS model, and changing it risks the TTS conversion flow.
 
 ## 6. Resource estimates
 
@@ -305,7 +306,7 @@ Intentionally not touched: `modeling_vibevoice_inference.py`, `modeling_vibevoic
 | FP8 on the conv encoders degrades transcripts | quality | Same approach already works for the TTS encoders; if ASR quality drops, keep encoders in bf16 (option on the converter) |
 | Long prefill (27k tokens) memory on smaller GPUs | OOM | D7, offloading, FP8; document a recommended max duration per VRAM size after remote tests |
 | Greedy decoding loops / repeats on long audio | quality | Expose `repetition_penalty` (upstream does); `max_new_tokens` cap |
-| Output JSON truncated at `max_new_tokens` | partial transcript | Default 8192 (Gradio default); return `reach_max_new_tokens`; post-processing returns what parses |
+| Output JSON truncated at `max_new_tokens` | partial transcript | Default 8192 (upstream CLI now uses 32768; raise it for very long audio); return `reach_max_new_tokens`; post-processing returns what parses |
 | Stochastic acoustic sampling (D9) | run-to-run variation | Seeded; documented |
 
 ## 11. Open questions
@@ -324,3 +325,20 @@ These need the checkpoint or your decision.
 - **Q2 — default `max_new_tokens`.** Upstream CLI uses 512 (too short for long audio), Gradio uses 8192. Proposal: 8192.
 - **Q3 — EOS tokens.** Upstream passes only `tokenizer.eos_token_id`, but HF `generate` also merges `generation_config.json`. I'll mirror whatever the checkpoint's `generation_config.json` declares.
 - **Q4 — FP8 scope.** Convert everything (as the TTS converter does), or keep the speech encoders in bf16? Proposal: everything by default, with a flag to keep encoders in bf16; decide after the remote quality check.
+
+## 12. Implementation status (phase 1)
+
+Open questions resolved by the checkpoint in `models/VibeVoice-ASR` (`config.json` + index only, no weights loaded locally):
+
+- **Q1**: 1177 checkpoint keys; 901 are used and match the model's `state_dict` exactly; the other 276 are acoustic decoder weights and are ignored. `max_position_embeddings` is 131072. There is no `preprocessor_config.json` or `generation_config.json`. The bundled Qwen2.5 tokenizer reproduces upstream token ids.
+- **Q2**: `max_new_tokens` default 8192 (your decision).
+- **Q3**: EOS is `tokenizer.eos_token_id` only (no `generation_config.json`).
+- **Q4**: the converter casts everything, like the TTS converter. A "keep encoders in bf16" flag is not implemented; revisit after the remote quality check.
+
+Local verification (CPU, tiny random models):
+
+- `tests/test_asr.py` (34 tests) and the existing suite pass.
+- A scratch parity script loaded the **same random weights** into this port and into upstream's `VibeVoiceASRForConditionalGeneration` (fp32, sdpa). Results:
+  - speech features for one-shot and segmented encode: bit-identical;
+  - generated tokens for greedy, greedy + repetition penalty, and seeded sampling: identical.
+- One-shot vs segmented encode draws acoustic noise in a different memory layout (`randn_like` keeps the one-shot mean's permuted strides). This matches upstream: the two paths are statistically equivalent but not elementwise equal.
