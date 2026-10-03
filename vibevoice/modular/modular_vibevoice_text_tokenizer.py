@@ -205,7 +205,87 @@ class VibeVoiceTextTokenizerFast(Qwen2TokenizerFast):
         """Id used for padding (returns -100 for loss masking)."""
         return self._pad_id
 
+class VibeVoiceASRTextTokenizerFast(Qwen2TokenizerFast):
+    """Qwen2 fast tokenizer with the VibeVoice-ASR speech tokens and chat template."""
+
+    model_input_names = ["input_ids", "attention_mask"]
+
+    def __init__(
+        self,
+        vocab_file=None,
+        merges_file=None,
+        tokenizer_file=None,
+        unk_token="<|endoftext|>",
+        bos_token=None,
+        eos_token="<|endoftext|>",
+        pad_token="<|endoftext|>",
+        add_prefix_space=False,
+        **kwargs,
+    ):
+        super().__init__(
+            vocab_file=vocab_file,
+            merges_file=merges_file,
+            tokenizer_file=tokenizer_file,
+            unk_token=unk_token,
+            bos_token=bos_token,
+            eos_token=eos_token,
+            pad_token=pad_token,
+            add_prefix_space=add_prefix_space,
+            **kwargs,
+        )
+
+        self._add_vibevoice_special_tokens()
+
+        # The ASR model was trained with this template (no default system turn), so it replaces the Qwen one.
+        self.chat_template = "{% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}"
+
+    def _add_vibevoice_special_tokens(self):
+        """Add VibeVoice-ASR speech special tokens (they reuse Qwen vision/box tokens)."""
+        special_tokens = {
+            "additional_special_tokens": [
+                "<|object_ref_start|>",
+                "<|object_ref_end|>",
+                "<|box_start|>",
+            ]
+        }
+        num_added = self.add_special_tokens(special_tokens)
+
+        self._speech_start_id = self.convert_tokens_to_ids("<|object_ref_start|>")
+        self._speech_end_id = self.convert_tokens_to_ids("<|object_ref_end|>")
+        self._speech_pad_id = self.convert_tokens_to_ids("<|box_start|>")
+
+        self._eos_id = self.eos_token_id
+        self._pad_id = self.convert_tokens_to_ids("<|image_pad|>")
+
+        return num_added
+
+    @property
+    def eos_id(self) -> int:
+        """Id of the end of sequence token."""
+        return self._eos_id
+
+    @property
+    def speech_start_id(self) -> int:
+        """Id of the speech start token."""
+        return self._speech_start_id
+
+    @property
+    def speech_end_id(self) -> int:
+        """Id of the speech end token."""
+        return self._speech_end_id
+
+    @property
+    def speech_pad_id(self) -> int:
+        """Id of the speech placeholder token replaced by speech embeddings."""
+        return self._speech_pad_id
+
+    @property
+    def pad_id(self) -> int:
+        """Id used for left padding."""
+        return self._pad_id
+
 __all__ = [
     "VibeVoiceTextTokenizer",
     "VibeVoiceTextTokenizerFast",
+    "VibeVoiceASRTextTokenizerFast",
 ]

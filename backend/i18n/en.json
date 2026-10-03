@@ -47,7 +47,13 @@
     "quick_generate_text_required": "Text to generate is required",
     "quick_generate_not_found": "Quick generation not found",
     "quick_generate_item_not_found": "Quick generation item not found",
-    "quick_generate_voice_not_found": "Voice file not found"
+    "quick_generate_voice_not_found": "Voice file not found",
+    "transcription_audio_required": "Audio file is required",
+    "transcription_not_found": "Transcription not found",
+    "transcription_audio_not_found": "Source audio not found",
+    "transcription_not_completed": "Transcription is not completed yet",
+    "transcription_running": "Cannot delete a transcription that is still running",
+    "transcription_context_too_long": "Context info must be at most {max} characters"
   },
   "success": {
     "project_created": "Project created successfully",
@@ -77,7 +83,10 @@
     "preset_voice_deleted": "Preset voice deleted successfully",
     "preset_voices_deleted": "Preset voices deleted successfully",
     "quick_generate_started": "Quick generation started successfully",
-    "quick_generate_deleted": "Quick generation deleted successfully"
+    "quick_generate_deleted": "Quick generation deleted successfully",
+    "transcription_started": "Transcription started successfully",
+    "transcription_deleted": "Transcription deleted successfully",
+    "transcriptions_deleted": "Transcriptions deleted successfully"
   },
   "status": {
     "healthy": "Service is healthy",

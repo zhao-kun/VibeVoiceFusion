@@ -1,8 +1,8 @@
 """
-OpenAI-Compatible TTS Service
+OpenAI-Compatible TTS and transcription Service
 
-Provides a synchronous wrapper over VibeVoice's async quick generation engine,
-implementing the OpenAI TTS API contract (POST /v1/audio/speech).
+Provides synchronous wrappers over VibeVoice's async quick generation and ASR engines,
+implementing the OpenAI API contracts POST /v1/audio/speech and POST /v1/audio/transcriptions.
 """
 import os
 import shutil
@@ -13,6 +13,8 @@ from typing import Optional, Tuple
 
 from backend.services.preset_voice_service import PresetVoiceService
 from backend.services.quick_generate_service import QuickGenerateService
+from backend.services.transcription_service import TranscriptionService
+from backend.models.transcription import Transcription
 from backend.task_manager.task import gm
 from backend.inference.quick_generate_inference import QuickGenerateInferenceBase
 from config.configuration_vibevoice import InferencePhase
@@ -28,6 +30,15 @@ MODEL_MAPPING = {
     'tts-1-hd': 'float8_e4m3fn',
 }
 
+# Transcription model name → model_dtype mapping
+ASR_MODEL_MAPPING = {
+    'vibevoice-asr': 'bf16',
+    'vibevoice-asr-fp8': 'float8_e4m3fn',
+    'whisper-1': 'bf16',
+}
+
+TRANSCRIPTION_RESPONSE_FORMATS = ('json', 'text', 'verbose_json')
+
 # Supported output formats and their MIME types
 # Matches OpenAI's supported formats: mp3, opus, aac, flac, wav, pcm
 FORMAT_MIME_TYPES = {
@@ -42,12 +53,16 @@ FORMAT_MIME_TYPES = {
 # Polling and timeout configuration
 POLL_INTERVAL = 0.5  # seconds
 DEFAULT_TIMEOUT = 300  # seconds
+# Long recordings (the model accepts up to ~60 minutes) decode far slower than speech generation
+TRANSCRIPTION_TIMEOUT = 1800  # seconds
 
 
 class OpenAICompatService:
     """Service for OpenAI-compatible TTS API"""
 
     def __init__(self, workspace_dir: Path, preset_dir: Path, fake_model: bool = False):
+        self.workspace_dir = workspace_dir
+        self.fake_model = fake_model
         self.quick_generate_service = QuickGenerateService(
             workspace_dir=workspace_dir,
             fake_model=fake_model,
@@ -111,6 +126,64 @@ class OpenAICompatService:
 
         available = ', '.join(sorted(MODEL_MAPPING.keys()))
         return None, f"Model '{model_name}' not found. Available models: {available}"
+
+    def resolve_asr_model(self, model_name: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Resolve OpenAI-compat transcription model name to VibeVoice-ASR model_dtype.
+
+        Returns:
+            Tuple of (model_dtype, error_message).
+        """
+        model_dtype = ASR_MODEL_MAPPING.get(model_name.lower())
+        if model_dtype:
+            return model_dtype, None
+
+        available = ', '.join(sorted(ASR_MODEL_MAPPING.keys()))
+        return None, f"Model '{model_name}' not found. Available models: {available}"
+
+    def transcribe_audio(self, file_data: bytes, filename: str, model_dtype: str,
+                         prompt: Optional[str] = None,
+                         temperature: float = 0.0,
+                         timeout: int = TRANSCRIPTION_TIMEOUT) -> Tuple[Optional[Transcription], Optional[str], Optional[int]]:
+        """
+        Transcribe audio synchronously by submitting an ASR task and waiting for completion.
+
+        The record stays in the standalone transcription history, like speech requests stay in quick generate.
+
+        Returns:
+            Tuple of (transcription, error_message, http_status_code).
+            On success: (transcription, None, None). On failure: (None, error_msg, status_code).
+        """
+        if gm.has_task():
+            return None, "Server is busy processing another request. Please retry later.", 503
+
+        transcription_service = TranscriptionService.for_workspace(self.workspace_dir, fake_model=self.fake_model)
+        audio_file = transcription_service.save_audio_file(file_data, filename)
+        transcription = transcription_service.start_transcription(
+            audio_file=audio_file,
+            original_filename=filename,
+            context_info=prompt,
+            model_dtype=model_dtype,
+            temperature=temperature,
+            seeds=42,
+        )
+        if not transcription:
+            return None, "Server is busy processing another request. Please retry later.", 503
+
+        request_id = transcription.request_id
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            time.sleep(POLL_INTERVAL)
+
+            current = transcription_service.get_transcription(request_id)
+            if not current:
+                return None, "Transcription task disappeared unexpectedly.", 500
+            if current.status == InferencePhase.COMPLETED:
+                return current, None, None
+            if current.status == InferencePhase.FAILED:
+                return None, current.error_message or "Transcription failed.", 500
+
+        return None, "Transcription timed out. The server may be under heavy load.", 504
 
     def generate_speech(self, text: str, voice_filename: str, model_dtype: str,
                         response_format: str = 'wav',

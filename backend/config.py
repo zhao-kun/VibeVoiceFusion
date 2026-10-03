@@ -28,6 +28,7 @@ class Config:
     # Model settings
     MODEL_PATH = os.environ.get('MODEL_PATH', './models/vibevoice')
     MODEL_DEVICE = os.environ.get('MODEL_DEVICE', 'cuda')  # or 'cpu'
+    ASR_MODEL_PATH = os.environ.get('ASR_MODEL_PATH', './models/VibeVoice-ASR')
 
     # Generation settings
     MAX_GENERATION_TIME = int(os.environ.get('MAX_GENERATION_TIME', 300))  # 5 minutes
@@ -40,6 +41,15 @@ class Config:
     RATELIMIT_DEFAULT = os.environ.get('RATELIMIT_DEFAULT', '100 per hour')
 
     FAKE_MODEL = os.environ.get('FAKE_MODEL', 'false').lower() == 'true'
+
+    # Live (streaming) transcription over the OpenAI Realtime WebSocket at /v1/realtime
+    STREAMING_ASR_MAX_SESSION_SECONDS = int(os.environ.get('STREAMING_ASR_MAX_SESSION_SECONDS', 1800))
+    STREAMING_ASR_IDLE_TIMEOUT_SECONDS = int(os.environ.get('STREAMING_ASR_IDLE_TIMEOUT_SECONDS', 60))
+    STREAMING_ASR_MAX_WINDOW_SECONDS = float(os.environ.get('STREAMING_ASR_MAX_WINDOW_SECONDS', 30))
+    STREAMING_ASR_SILENCE_COMMIT_SECONDS = float(os.environ.get('STREAMING_ASR_SILENCE_COMMIT_SECONDS', 1.0))
+    STREAMING_ASR_SILENCE_RMS = float(os.environ.get('STREAMING_ASR_SILENCE_RMS', 0.008))
+    # Browsers fail the handshake unless the server echoes one of the requested subprotocols
+    SOCK_SERVER_OPTIONS = {'subprotocols': ['realtime'], 'ping_interval': 25}
 
 @dataclass
 class DevelopmentConfig(Config):

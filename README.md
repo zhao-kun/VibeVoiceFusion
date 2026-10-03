@@ -486,6 +486,8 @@ python demo/local_file_inference.py \
 - `--cfg_scale`: Classifier-Free Guidance scale (default: 1.3)
 - `--seed`: Random seed for reproducibility
 
+See [Demo Model Tools](docs/demo-tools.md) for all command-line tools: TTS, Realtime 0.5B, ASR, and model/voice-preset conversion.
+
 ### Configuration
 
 #### Backend Configuration

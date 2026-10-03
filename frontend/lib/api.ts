@@ -36,8 +36,17 @@ import type {
   CurrentQuickGenerateResponse,
   QuickGenerateHistoryResponse
 } from '@/types/quickGenerate';
+import type {
+  Transcription,
+  StartTranscriptionRequest,
+  StartTranscriptionResponse,
+  CurrentTranscriptionResponse,
+  TranscriptionHistoryResponse,
+  BatchDeleteTranscriptionsResponse,
+  TranscriptFormat,
+} from '@/types/transcription';
 
-import type { OffloadingConfig } from '@/types/generation';
+import type { OffloadingConfig, OffloadingPreset } from '@/types/generation';
 
 // API base URL configuration
 // Development: Full URL to backend server (different origin)
@@ -1064,6 +1073,162 @@ class ApiClient {
    */
   getQuickGenerationVoicePreviewByIndexUrl(requestId: string, voiceIndex: number): string {
     return `${this.baseUrl}/quick-generate/${encodeURIComponent(requestId)}/voice/${voiceIndex}/preview`;
+  }
+
+  // ============ Transcription API ============
+  // A null projectId targets standalone transcriptions (/transcriptions), otherwise /projects/{id}/transcriptions
+
+  private transcriptionBase(projectId: string | null): string {
+    return projectId ? `/projects/${encodeURIComponent(projectId)}/transcriptions` : '/transcriptions';
+  }
+
+  /**
+   * Start a transcription task
+   */
+  async startTranscription(
+    projectId: string | null,
+    data: StartTranscriptionRequest
+  ): Promise<StartTranscriptionResponse> {
+    const formData = new FormData();
+    formData.append('audio_file', data.audio_file);
+
+    if (data.context_info) {
+      formData.append('context_info', data.context_info);
+    }
+    if (data.model_dtype) {
+      formData.append('model_dtype', data.model_dtype);
+    }
+    if (data.max_new_tokens !== undefined) {
+      formData.append('max_new_tokens', data.max_new_tokens.toString());
+    }
+    if (data.temperature !== undefined) {
+      formData.append('temperature', data.temperature.toString());
+    }
+    if (data.top_p !== undefined) {
+      formData.append('top_p', data.top_p.toString());
+    }
+    if (data.repetition_penalty !== undefined) {
+      formData.append('repetition_penalty', data.repetition_penalty.toString());
+    }
+    if (data.seeds !== undefined) {
+      formData.append('seeds', data.seeds.toString());
+    }
+    if (data.offloading) {
+      formData.append('offloading', JSON.stringify(data.offloading));
+    }
+
+    const url = `${this.baseUrl}${this.transcriptionBase(projectId)}`;
+    const locale = typeof window !== 'undefined'
+      ? localStorage.getItem('vibevoice-locale') || 'en'
+      : 'en';
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-Language': locale,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        error: 'Unknown error',
+        message: response.statusText
+      }));
+      throw new Error(error.message || error.error || response.statusText);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Get a transcription with live progress
+   */
+  async getTranscription(projectId: string | null, requestId: string): Promise<Transcription> {
+    return this.fetch(`${this.transcriptionBase(projectId)}/${encodeURIComponent(requestId)}`);
+  }
+
+  /**
+   * Get the running transcription of this scope
+   */
+  async getCurrentTranscription(projectId: string | null): Promise<CurrentTranscriptionResponse> {
+    return this.fetch(`${this.transcriptionBase(projectId)}/current`);
+  }
+
+  /**
+   * List transcription history
+   */
+  async listTranscriptions(
+    projectId: string | null,
+    options?: { limit?: number; offset?: number }
+  ): Promise<TranscriptionHistoryResponse> {
+    const params = new URLSearchParams();
+    if (options?.limit !== undefined) {
+      params.append('limit', options.limit.toString());
+    }
+    if (options?.offset !== undefined) {
+      params.append('offset', options.offset.toString());
+    }
+
+    const queryString = params.toString();
+    const listPath = projectId ? this.transcriptionBase(projectId) : '/transcriptions/history';
+    return this.fetch(`${listPath}${queryString ? '?' + queryString : ''}`);
+  }
+
+  /**
+   * Delete a transcription
+   */
+  async deleteTranscription(
+    projectId: string | null,
+    requestId: string
+  ): Promise<{ message: string; request_id: string }> {
+    return this.fetch(`${this.transcriptionBase(projectId)}/${encodeURIComponent(requestId)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Delete multiple transcriptions
+   */
+  async batchDeleteTranscriptions(
+    projectId: string | null,
+    requestIds: string[]
+  ): Promise<BatchDeleteTranscriptionsResponse> {
+    return this.fetch(`${this.transcriptionBase(projectId)}/batch-delete`, {
+      method: 'POST',
+      body: JSON.stringify({ request_ids: requestIds }),
+    });
+  }
+
+  /**
+   * Get URL of the source audio of a transcription
+   */
+  getTranscriptionAudioUrl(projectId: string | null, requestId: string): string {
+    return `${this.baseUrl}${this.transcriptionBase(projectId)}/${encodeURIComponent(requestId)}/audio`;
+  }
+
+  /**
+   * Get download URL for a transcript
+   */
+  getTranscriptionDownloadUrl(projectId: string | null, requestId: string, format: TranscriptFormat): string {
+    return `${this.baseUrl}${this.transcriptionBase(projectId)}/${encodeURIComponent(requestId)}/download?format=${format}`;
+  }
+
+  /**
+   * WebSocket URL of the OpenAI-compatible realtime transcription endpoint (/v1/realtime)
+   */
+  getRealtimeTranscriptionUrl(projectId: string | null, offloading?: OffloadingPreset): string {
+    // The realtime endpoint lives at /v1 next to /api/v1, and the Next dev proxy does not forward WebSockets
+    const httpBase = new URL(this.baseUrl.replace(/\/api\/v1\/?$/, '') || '/', window.location.href);
+    httpBase.protocol = httpBase.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = new URL(`${httpBase.pathname.replace(/\/$/, '')}/v1/realtime`, httpBase);
+    if (projectId) {
+      url.searchParams.set('project_id', projectId);
+    }
+    if (offloading) {
+      url.searchParams.set('offloading', offloading);
+    }
+    return url.toString();
   }
 }
 
