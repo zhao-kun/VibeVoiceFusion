@@ -1,13 +1,16 @@
 """
-OpenAI-Compatible TTS API endpoint
+OpenAI-Compatible TTS and transcription API endpoints
 
-Implements POST /v1/audio/speech for drop-in compatibility with OpenAI TTS clients.
+Implements POST /v1/audio/speech and POST /v1/audio/transcriptions for drop-in compatibility with OpenAI clients.
 This uses a separate blueprint registered at /v1 (not /api/v1) to match the OpenAI URL scheme.
 """
-from flask import Blueprint, request, jsonify, send_file, current_app
+from flask import Blueprint, request, jsonify, send_file, current_app, Response
 
+from backend.api.quick_generate import ALLOWED_EXTENSIONS, _allowed_file
+from backend.models.transcription import segment_seconds, transcript_plain_text
 from backend.services.openai_compat_service import (
     OpenAICompatService, MODEL_MAPPING, FORMAT_MIME_TYPES,
+    ASR_MODEL_MAPPING, TRANSCRIPTION_RESPONSE_FORMATS,
 )
 from util.logger import get_logger
 
@@ -152,6 +155,114 @@ def create_speech():
     )
 
 
+@openai_bp.route('/audio/transcriptions', methods=['POST'])
+def create_transcription():
+    """
+    OpenAI-compatible transcription endpoint.
+
+    Request (multipart/form-data):
+        file             // Required, audio file
+        model            // Required, e.g. "vibevoice-asr" or "whisper-1"
+        prompt           // Optional, passed to the model as context info (hotwords, names, topic)
+        response_format  // Optional, default: json (supports: json, text, verbose_json)
+        temperature      // Optional, 0-1, default: 0 (greedy)
+        language         // Optional, accepted but not used; echoed in verbose_json
+
+    Response:
+        json: {"text": "..."}; text: plain text; verbose_json: text, duration and speaker-labelled segments.
+    """
+    service = _get_service()
+
+    auth_header = request.headers.get('Authorization')
+    if not service.validate_api_key(auth_header):
+        return _openai_error(
+            "Invalid API key provided.",
+            error_type="authentication_error",
+            code="invalid_api_key",
+            status=401,
+        )
+
+    audio = request.files.get('file')
+    if audio is None or not audio.filename:
+        return _openai_error("Missing required parameter: 'file'.", code="missing_file")
+    if not _allowed_file(audio.filename):
+        supported = ', '.join(sorted(ALLOWED_EXTENSIONS))
+        return _openai_error(
+            f"Unsupported file type '{audio.filename}'. Supported formats: {supported}",
+            code="unsupported_file_type",
+        )
+
+    model = request.form.get('model')
+    if not model:
+        return _openai_error("Missing required parameter: 'model'.", code="missing_model")
+
+    response_format = request.form.get('response_format', 'json')
+    if response_format not in TRANSCRIPTION_RESPONSE_FORMATS:
+        supported = ', '.join(TRANSCRIPTION_RESPONSE_FORMATS)
+        return _openai_error(
+            f"Unsupported response_format '{response_format}'. Supported formats: {supported}",
+            code="unsupported_format",
+        )
+
+    try:
+        temperature = float(request.form.get('temperature', 0) or 0)
+    except ValueError:
+        return _openai_error("Invalid 'temperature': must be a number.", code="invalid_temperature")
+    if temperature < 0 or temperature > 1:
+        return _openai_error("Invalid 'temperature': must be between 0 and 1.", code="invalid_temperature")
+
+    model_dtype, err = service.resolve_asr_model(model)
+    if err:
+        logger.warning(f"Unknown transcription model '{model}', falling back to bf16")
+        model_dtype = 'bf16'
+
+    prompt = (request.form.get('prompt') or '').strip() or None
+    language = request.form.get('language')
+
+    try:
+        transcription, err, status_code = service.transcribe_audio(
+            file_data=audio.read(),
+            filename=audio.filename,
+            model_dtype=model_dtype,
+            prompt=prompt,
+            temperature=temperature,
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in transcription: {e}", exc_info=True)
+        return _openai_error(
+            "An internal error occurred during transcription.",
+            error_type="server_error",
+            status=500,
+        )
+
+    if err:
+        error_type = "server_error" if status_code >= 500 else "invalid_request_error"
+        return _openai_error(err, error_type=error_type, status=status_code)
+
+    text = transcript_plain_text(transcription.segments, transcription.raw_text)
+    if response_format == 'text':
+        return Response(text, mimetype='text/plain; charset=utf-8')
+    if response_format == 'json':
+        return jsonify({"text": text})
+
+    segments = []
+    for index, seg in enumerate(transcription.segments):
+        segments.append({
+            "id": index,
+            "start": segment_seconds(seg.get('start_time')),
+            "end": segment_seconds(seg.get('end_time')),
+            "speaker": seg.get('speaker_id'),
+            "text": str(seg.get('text', '')),
+        })
+    return jsonify({
+        "task": "transcribe",
+        "language": language or "unknown",
+        "duration": transcription.audio_duration,
+        "text": text,
+        "segments": segments,
+    })
+
+
 @openai_bp.route('/models', methods=['GET'])
 def list_models():
     """
@@ -161,7 +272,7 @@ def list_models():
     """
     models = []
     seen = set()
-    for model_name in sorted(MODEL_MAPPING.keys()):
+    for model_name in sorted(list(MODEL_MAPPING.keys()) + list(ASR_MODEL_MAPPING.keys())):
         if model_name not in seen:
             seen.add(model_name)
             models.append({

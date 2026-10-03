@@ -135,6 +135,36 @@ Both `Bearer <key>` and raw `<key>` formats are accepted, but `Bearer` prefix is
 
 The primary TTS endpoint. Accepts a JSON request body and returns binary audio data synchronously. The server blocks until generation is complete (up to 300 seconds).
 
+### `POST /v1/audio/transcriptions` — Transcribe Audio
+
+Speech-to-text backed by VibeVoice-ASR. Accepts `multipart/form-data` (same as OpenAI) and blocks until the transcription finishes (up to 1800 seconds). It uses the same GPU task queue, API-key check and `503`-when-busy behaviour as `/v1/audio/speech`. Each request is also stored in the standalone transcription history (`/api/v1/transcriptions/history`), so results can be reviewed in the Quick Transcribe page.
+
+**Parameter mapping:**
+
+| OpenAI parameter | VibeVoice behaviour |
+|------------------|---------------------|
+| `file` | Required. WAV, MP3, M4A, FLAC, WEBM |
+| `model` | Required. Mapped to `model_dtype` (table below); unknown names fall back to `bf16` |
+| `prompt` | Passed to the model as `context_info` (hotwords, names, topic) |
+| `response_format` | `json` (default), `text`, `verbose_json`. `srt` / `vtt` return `400 unsupported_format` |
+| `temperature` | 0-1, default 0 (greedy decoding) |
+| `language` | Not used by the model; echoed back in `verbose_json` |
+| `timestamp_granularities[]`, `stream`, `include[]` | Ignored |
+
+**Model mapping:**
+
+| Model | model_dtype |
+|-------|-------------|
+| `vibevoice-asr` | `bf16` |
+| `vibevoice-asr-fp8` | `float8_e4m3fn` |
+| `whisper-1` | `bf16` (OpenAI alias) |
+
+**`verbose_json` differences from OpenAI:**
+- Segments carry `id`, `start`, `end`, `text`, plus a VibeVoice `speaker` field; OpenAI's token-level fields (`tokens`, `avg_logprob`, `compression_ratio`, `no_speech_prob`, ...) are not returned.
+- `language` is the request's `language` value, or `"unknown"`. VibeVoice-ASR does not report a detected language, so SDKs that expect an ISO language name may need to tolerate this.
+
+See [APIs.md](APIs.md#2-create-transcription) for full request/response examples.
+
 ### `GET /v1/models` — List Available Models
 
 Returns a list of available models in OpenAI-compatible format.
@@ -147,7 +177,10 @@ Returns a list of available models in OpenAI-compatible format.
     { "id": "tts-1", "object": "model", "created": 0, "owned_by": "vibevoice" },
     { "id": "tts-1-hd", "object": "model", "created": 0, "owned_by": "vibevoice" },
     { "id": "vibevoice-7b", "object": "model", "created": 0, "owned_by": "vibevoice" },
-    { "id": "vibevoice-7b-hd", "object": "model", "created": 0, "owned_by": "vibevoice" }
+    { "id": "vibevoice-7b-hd", "object": "model", "created": 0, "owned_by": "vibevoice" },
+    { "id": "vibevoice-asr", "object": "model", "created": 0, "owned_by": "vibevoice" },
+    { "id": "vibevoice-asr-fp8", "object": "model", "created": 0, "owned_by": "vibevoice" },
+    { "id": "whisper-1", "object": "model", "created": 0, "owned_by": "vibevoice" }
   ]
 }
 ```
@@ -169,6 +202,7 @@ These are defined in `backend/services/openai_compat_service.py`:
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `DEFAULT_TIMEOUT` | `300` seconds | Maximum time the server will block waiting for generation to complete. Returns `504 Gateway Timeout` if exceeded. |
+| `TRANSCRIPTION_TIMEOUT` | `1800` seconds | Same, for `/v1/audio/transcriptions` (long recordings take longer to decode). |
 | `POLL_INTERVAL` | `0.5` seconds | Internal polling frequency when checking generation status. |
 | Max input length | `4096` characters | Maximum allowed length for the `input` text field. |
 
@@ -344,4 +378,5 @@ await fs.promises.writeFile("output.wav", buffer);
 - **`instructions` parameter not supported** — this is an OpenAI GPT-4o-mini-tts-only feature
 - **No billing/usage tracking** — no token counting or usage metering
 - **Extension parameters not yet wired** — `seeds`, `cfg_scale`, `offloading` in request body are currently ignored (reserved for future implementation)
+- **Transcriptions: no `srt` / `vtt` output, no streaming, no language detection** — see the transcriptions section above
 - **Non-wav format conversion requires ffmpeg** — if `ffmpeg` is not installed, requesting `mp3`, `flac`, `opus`, `aac`, or `pcm` formats will return `500`

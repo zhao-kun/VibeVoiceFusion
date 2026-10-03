@@ -14,7 +14,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   }, [pathname]);
 
   const isHomePage = pathname === "/";
-  const isQuickGeneratePage = pathname === "/quick-generate";
+  const isQuickGeneratePage = pathname === "/quick-generate" || pathname === "/quick-transcribe";
   const showNavigation = mounted && !isHomePage;
 
   // Always return consistent wrapper structure

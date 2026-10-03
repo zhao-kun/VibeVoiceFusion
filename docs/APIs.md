@@ -17,9 +17,10 @@ http://localhost:9527/api/v1
 5. [Tasks API (Unified)](#tasks-api-unified)
 6. [Generation API](#generation-api)
 7. [Quick Generate API](#quick-generate-api)
-8. [OpenAI-Compatible TTS API](#openai-compatible-tts-api)
-9. [Dataset Management API](#dataset-management-api)
-10. [Training Management API](#training-management-api)
+8. [Transcription API](#transcription-api)
+9. [OpenAI-Compatible TTS API](#openai-compatible-tts-api) (speech and transcriptions)
+10. [Dataset Management API](#dataset-management-api)
+11. [Training Management API](#training-management-api)
 
 ---
 
@@ -740,6 +741,25 @@ Get the currently running task (either inference or training) regardless of proj
 }
 ```
 
+**Response (200 OK, transcription task running):**
+```json
+{
+  "message": "Current transcription task retrieved successfully",
+  "task": {
+    "type": "transcription",
+    "project_id": null,
+    "data": {
+      "request_id": "5f0c3c3e9a7b4c8e8f1d2a3b4c5d6e7f",
+      "original_filename": "meeting.wav",
+      "status": "inferencing",
+      "generated_tokens": 128
+    }
+  }
+}
+```
+
+`project_id` is `null` for standalone transcriptions and the project ID for project-scoped ones. `data` is the full [Transcription](#transcription) object (abbreviated above).
+
 **Response (200 OK, no active task):**
 ```json
 {
@@ -758,6 +778,7 @@ Get the currently running task (either inference or training) regardless of proj
 |------|-------------|
 | `inference` | Voice generation task is running |
 | `training` | LoRA training task is running |
+| `transcription` | ASR transcription task is running |
 | `null` | No active task |
 
 ## Use Case
@@ -1467,11 +1488,327 @@ Quick Generate supports batch generation with different random seeds:
 
 ---
 
+# Transcription API
+
+## Overview
+
+The Transcription API transcribes audio with the VibeVoice-ASR model into speaker-labelled, timestamped segments. It runs on the same single-threaded GPU task queue as generation and training, so only one task (of any type) runs at a time.
+
+The same endpoints exist in two scopes that share one engine but keep separate storage:
+
+| Scope | Base path | Storage |
+|-------|-----------|---------|
+| Standalone (no project) | `/api/v1/transcriptions` | `workspace/_transcriptions/` |
+| Project | `/api/v1/projects/{project_id}/transcriptions` | `workspace/{project_id}/transcriptions/` |
+
+A transcription is only visible in the scope it was created in. Project-scoped endpoints return `404` with `errors.project_not_found` when the project does not exist.
+
+**Model location:** `ASR_MODEL_PATH` environment variable (default `./models/VibeVoice-ASR`). The engine prefers a converted single-file checkpoint (`vibevoice_asr_bf16.safetensors` / `vibevoice_asr_float8_e4m3fn.safetensors`) and otherwise loads the original HuggingFace weights from that directory. See [Demo Tools](demo-tools.md) for conversion.
+
+## Data Models
+
+### Transcription
+
+```json
+{
+  "request_id": "5f0c3c3e9a7b4c8e8f1d2a3b4c5d6e7f",
+  "project_id": null,
+  "audio_file": "0b8e6c2f4d1a4e3b9c7d5f2a1e3b4c5d.wav",
+  "original_filename": "meeting.wav",
+  "status": "completed",
+  "model_dtype": "bf16",
+  "max_new_tokens": 8192,
+  "temperature": 0.0,
+  "top_p": 1.0,
+  "repetition_penalty": 1.0,
+  "seeds": 42,
+  "context_info": "VibeVoice, Qwen",
+  "offloading": null,
+  "audio_duration": 63.2,
+  "generated_tokens": 412,
+  "reach_max_new_tokens": false,
+  "raw_text": "[{\"Start\":0.0,\"End\":2.5,\"Speaker\":0,\"Content\":\"Hello everyone.\"}]",
+  "segments": [
+    {"start_time": 0.0, "end_time": 2.5, "speaker_id": 0, "text": "Hello everyone."}
+  ],
+  "text_preview": "Hello everyone.",
+  "percentage": 100,
+  "details": {
+    "preprocessing_duration": 0.42,
+    "model_load_duration": 18.3,
+    "encode_time": 1.2,
+    "prefill_time": 0.8,
+    "decode_time": 9.6,
+    "prompt_tokens": 512,
+    "speech_tokens": 474,
+    "offloading_config": {}
+  },
+  "error_message": null,
+  "created_at": "2026-10-03T10:00:00",
+  "updated_at": "2026-10-03T10:00:31",
+  "completed_at": "2026-10-03T10:00:31"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `generated_tokens` | Tokens decoded so far; updated live while `inferencing` |
+| `percentage` | `null` while decoding (the final token count is unknown), `100` when completed |
+| `reach_max_new_tokens` | `true` if decoding stopped at `max_new_tokens`; the transcript may be truncated |
+| `raw_text` | Decoded model output before parsing |
+| `segments` | Parsed segments; empty if the model output could not be parsed |
+
+### Status Values
+
+| Status | Description |
+|--------|-------------|
+| `pending` | Task queued |
+| `preprocessing` | Loading audio and building the prompt |
+| `inferencing` | Model loaded, decoding tokens |
+| `completed` | Transcription finished |
+| `failed` | Transcription failed, see `error_message` |
+
+## Endpoints
+
+Paths below are shown for the standalone scope. For the project scope, replace `/api/v1/transcriptions` with `/api/v1/projects/{project_id}/transcriptions`; the only difference is the history list (see endpoint 4).
+
+### 1. Start Transcription
+
+**POST** `/api/v1/transcriptions`
+**POST** `/api/v1/projects/{project_id}/transcriptions`
+
+Upload an audio file and queue a transcription task. Uses multipart form data.
+
+**Form Data:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `audio_file` | file | Yes | Audio file (WAV, MP3, M4A, FLAC, WEBM) |
+| `context_info` | string | No | Hotwords, names or topic to guide the model (max 2000 characters) |
+| `model_dtype` | string | No | `bf16` (default) or `float8_e4m3fn` |
+| `max_new_tokens` | integer | No | 1-32768, default 8192 |
+| `temperature` | float | No | 0-2, default 0 (greedy) |
+| `top_p` | float | No | 0.01-1, default 1.0 |
+| `repetition_penalty` | float | No | 0.5-2, default 1.0 |
+| `seeds` | integer | No | Random seed (default: random) |
+| `offloading` | string (JSON) | No | Same format as Quick Generate, e.g. `{"enabled": true, "mode": "preset", "preset": "balanced"}` or `{"enabled": true, "mode": "manual", "num_gpu_layers": 20}` (1-28) |
+
+**Response (200 OK):**
+```json
+{
+  "message": "Transcription started successfully",
+  "request_id": "5f0c3c3e9a7b4c8e8f1d2a3b4c5d6e7f",
+  "project_id": null,
+  "status": "pending"
+}
+```
+
+**Response (400 Bad Request):** missing audio file, unsupported file type, or invalid parameter.
+
+**Response (409 Conflict):** another task is running. The uploaded audio is discarded.
+```json
+{
+  "error": "Conflict",
+  "message": "Task manager is busy. Please wait for the current task to complete"
+}
+```
+
+**Example:**
+```bash
+curl -X POST "http://localhost:9527/api/v1/transcriptions" \
+  -F "audio_file=@meeting.wav" \
+  -F "context_info=VibeVoice, Qwen" \
+  -F 'offloading={"enabled": true, "mode": "preset", "preset": "balanced"}'
+```
+
+---
+
+### 2. Get Transcription
+
+**GET** `/api/v1/transcriptions/{request_id}`
+**GET** `/api/v1/projects/{project_id}/transcriptions/{request_id}`
+
+Returns the [Transcription](#transcription) object. While the task is running, the live state is returned (poll every 2 seconds).
+
+**Response (404 Not Found):** transcription does not exist in this scope.
+
+---
+
+### 3. Get Current Transcription
+
+**GET** `/api/v1/transcriptions/current`
+**GET** `/api/v1/projects/{project_id}/transcriptions/current`
+
+Returns the running transcription of this scope, or `null`.
+
+**Response (200 OK):**
+```json
+{
+  "message": "Current transcription retrieved successfully",
+  "transcription": { "request_id": "...", "status": "inferencing", "generated_tokens": 128 }
+}
+```
+
+**Response (200 OK, nothing running):**
+```json
+{
+  "message": "No active transcription task",
+  "transcription": null
+}
+```
+
+---
+
+### 4. List Transcriptions
+
+**GET** `/api/v1/transcriptions/history`
+**GET** `/api/v1/projects/{project_id}/transcriptions`
+
+Lists transcription summaries, newest first.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | 20 | Items per page |
+| `offset` | integer | 0 | Items to skip |
+
+**Response (200 OK):**
+```json
+{
+  "transcriptions": [
+    {
+      "request_id": "5f0c3c3e9a7b4c8e8f1d2a3b4c5d6e7f",
+      "project_id": null,
+      "status": "completed",
+      "original_filename": "meeting.wav",
+      "audio_duration": 63.2,
+      "text_preview": "Hello everyone.",
+      "segment_count": 12,
+      "model_dtype": "bf16",
+      "created_at": "2026-10-03T10:00:00",
+      "completed_at": "2026-10-03T10:00:31"
+    }
+  ],
+  "count": 1,
+  "total": 1
+}
+```
+
+---
+
+### 5. Get Source Audio
+
+**GET** `/api/v1/transcriptions/{request_id}/audio`
+**GET** `/api/v1/projects/{project_id}/transcriptions/{request_id}/audio`
+
+Streams the uploaded audio file (for playback next to the transcript).
+
+**Response (404 Not Found):** transcription or audio file not found.
+
+---
+
+### 6. Download Transcript
+
+**GET** `/api/v1/transcriptions/{request_id}/download`
+**GET** `/api/v1/projects/{project_id}/transcriptions/{request_id}/download`
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `format` | string | `json` | `json` or `txt` |
+| `download` | boolean | `true` | `true` sends `Content-Disposition: attachment` (`{original name}_transcript.{format}`) |
+
+**`txt` format:**
+```
+[00:00.00 - 00:02.50] Speaker 0: Hello everyone.
+[00:02.50 - 00:05.10] Speaker 1: Hi, thanks for joining.
+```
+
+**`json` format:**
+```json
+{
+  "request_id": "5f0c3c3e9a7b4c8e8f1d2a3b4c5d6e7f",
+  "file": "meeting.wav",
+  "audio_duration": 63.2,
+  "context_info": "VibeVoice, Qwen",
+  "raw_text": "...",
+  "segments": [
+    {"start_time": 0.0, "end_time": 2.5, "speaker_id": 0, "text": "Hello everyone."}
+  ]
+}
+```
+
+**Response (400 Bad Request):** unsupported `format`.
+**Response (404 Not Found):** transcription not found, or not completed yet.
+
+---
+
+### 7. Delete Transcription
+
+**DELETE** `/api/v1/transcriptions/{request_id}`
+**DELETE** `/api/v1/projects/{project_id}/transcriptions/{request_id}`
+
+Deletes the record and its uploaded audio file.
+
+**Response (200 OK):**
+```json
+{
+  "message": "Transcription deleted successfully",
+  "request_id": "5f0c3c3e9a7b4c8e8f1d2a3b4c5d6e7f"
+}
+```
+
+**Response (404 Not Found):** transcription not found.
+**Response (409 Conflict):** the transcription is still running.
+
+---
+
+### 8. Batch Delete Transcriptions
+
+**POST** `/api/v1/transcriptions/batch-delete`
+**POST** `/api/v1/projects/{project_id}/transcriptions/batch-delete`
+
+**Request Body:**
+```json
+{
+  "request_ids": ["id-1", "id-2"]
+}
+```
+
+**Response (200 OK):** running or unknown IDs are reported in `failed_ids`.
+```json
+{
+  "message": "Transcriptions deleted successfully",
+  "deleted_count": 1,
+  "failed_count": 1,
+  "deleted_ids": ["id-1"],
+  "failed_ids": ["id-2"]
+}
+```
+
+**Response (400 Bad Request):** `request_ids` missing or not a list.
+
+---
+
+## Workspace Structure
+
+```
+workspace/
+├── _transcriptions/            # Standalone transcriptions
+│   ├── history.json
+│   └── audio/{uuid}.{ext}
+└── {project-id}/
+    └── transcriptions/         # Project transcriptions
+        ├── history.json
+        └── audio/{uuid}.{ext}
+```
+
+---
+
 # OpenAI-Compatible TTS API
 
 ## Overview
 
-VibeVoice provides an OpenAI-compatible Text-to-Speech endpoint at `POST /v1/audio/speech`, enabling existing OpenAI TTS clients and SDKs to use VibeVoice as a drop-in replacement.
+VibeVoice provides an OpenAI-compatible Text-to-Speech endpoint at `POST /v1/audio/speech`, enabling existing OpenAI TTS clients and SDKs to use VibeVoice as a drop-in replacement. A speech-to-text endpoint at `POST /v1/audio/transcriptions` is backed by VibeVoice-ASR (see [Create Transcription](#2-create-transcription)).
 
 **Base URL:** `http://localhost:9527/v1` (note: `/v1`, not `/api/v1`)
 
@@ -1583,7 +1920,91 @@ response = client.audio.speech.create(
 response.stream_to_file("output.wav")
 ```
 
-### 2. List Models
+### 2. Create Transcription
+
+**POST** `/v1/audio/transcriptions`
+
+Transcribe an audio file with VibeVoice-ASR. Synchronous: blocks until the transcription finishes (timeout 1800 seconds). The result is also saved in the standalone transcription history (`/api/v1/transcriptions/history`).
+
+**Request (multipart/form-data):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `file` | file | Yes | Audio file (WAV, MP3, M4A, FLAC, WEBM) |
+| `model` | string | Yes | Model name (see Model Mapping below); unknown names fall back to `bf16` |
+| `prompt` | string | No | Passed to the model as context info (hotwords, names, topic) |
+| `response_format` | string | No | `json` (default), `text`, `verbose_json` |
+| `temperature` | number | No | 0-1, default 0 (greedy) |
+| `language` | string | No | Accepted but not used by the model; echoed back in `verbose_json` |
+
+Other OpenAI parameters (`timestamp_granularities[]`, `stream`, `include[]`) are not supported and are ignored.
+
+**Model Mapping:**
+
+| Model Name | VibeVoice model_dtype | Description |
+|------------|----------------------|-------------|
+| `vibevoice-asr` | `bf16` | Standard precision |
+| `vibevoice-asr-fp8` | `float8_e4m3fn` | FP8 weights (needs the converted FP8 checkpoint) |
+| `whisper-1` | `bf16` | OpenAI compatibility alias |
+
+**Response (200 OK, `json`):**
+```json
+{
+  "text": "Hello everyone.\nHi, thanks for joining."
+}
+```
+
+**Response (200 OK, `text`):** `text/plain` body with one line per segment.
+
+**Response (200 OK, `verbose_json`):**
+```json
+{
+  "task": "transcribe",
+  "language": "unknown",
+  "duration": 63.2,
+  "text": "Hello everyone.\nHi, thanks for joining.",
+  "segments": [
+    {"id": 0, "start": 0.0, "end": 2.5, "speaker": 0, "text": "Hello everyone."},
+    {"id": 1, "start": 2.5, "end": 5.1, "speaker": 1, "text": "Hi, thanks for joining."}
+  ]
+}
+```
+
+`speaker` is a VibeVoice extension not present in OpenAI's schema. Segments do not include OpenAI's token-level fields (`tokens`, `avg_logprob`, etc.). `language` is the request's `language` value, or `"unknown"` because VibeVoice-ASR does not report the detected language.
+
+**Error Responses:**
+
+| Status | Type | Code | Description |
+|--------|------|------|-------------|
+| 400 | `invalid_request_error` | `missing_file` | Missing `file` |
+| 400 | `invalid_request_error` | `unsupported_file_type` | Unsupported audio extension |
+| 400 | `invalid_request_error` | `missing_model` | Missing `model` |
+| 400 | `invalid_request_error` | `unsupported_format` | Unsupported `response_format` |
+| 400 | `invalid_request_error` | `invalid_temperature` | `temperature` not a number in 0-1 |
+| 401 | `authentication_error` | `invalid_api_key` | Invalid API key |
+| 503 | `server_error` | - | Task queue is busy |
+| 504 | `server_error` | - | Transcription timed out |
+| 500 | `server_error` | - | Transcription failed or internal error |
+
+**Examples:**
+
+```bash
+curl http://localhost:9527/v1/audio/transcriptions \
+  -F file=@meeting.wav \
+  -F model=vibevoice-asr \
+  -F response_format=verbose_json
+```
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:9527/v1", api_key="unused")
+with open("meeting.wav", "rb") as f:
+    result = client.audio.transcriptions.create(model="whisper-1", file=f)
+print(result.text)
+```
+
+### 3. List Models
 
 **GET** `/v1/models`
 
@@ -1597,7 +2018,10 @@ List available models in OpenAI-compatible format.
     {"id": "tts-1", "object": "model", "created": 0, "owned_by": "vibevoice"},
     {"id": "tts-1-hd", "object": "model", "created": 0, "owned_by": "vibevoice"},
     {"id": "vibevoice-7b", "object": "model", "created": 0, "owned_by": "vibevoice"},
-    {"id": "vibevoice-7b-hd", "object": "model", "created": 0, "owned_by": "vibevoice"}
+    {"id": "vibevoice-7b-hd", "object": "model", "created": 0, "owned_by": "vibevoice"},
+    {"id": "vibevoice-asr", "object": "model", "created": 0, "owned_by": "vibevoice"},
+    {"id": "vibevoice-asr-fp8", "object": "model", "created": 0, "owned_by": "vibevoice"},
+    {"id": "whisper-1", "object": "model", "created": 0, "owned_by": "vibevoice"}
   ]
 }
 ```

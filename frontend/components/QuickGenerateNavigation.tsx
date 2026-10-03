@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { useGlobalTask } from "@/lib/GlobalTaskContext";
 import { hasActiveTask } from "@/types/task";
 
 export default function QuickGenerateNavigation() {
   const router = useRouter();
+  const pathname = usePathname();
   const { t, locale, setLocale } = useLanguage();
   const { currentTask } = useGlobalTask();
 
@@ -19,8 +20,13 @@ export default function QuickGenerateNavigation() {
   // Navigate to the appropriate page based on task type
   const handleTaskIconClick = () => {
     if (currentTask) {
-      // Quick generation - already on this page, do nothing special
       if (currentTask.type === 'quick_generation') {
+        router.push('/quick-generate');
+        return;
+      }
+
+      if (currentTask.type === 'transcription' && !currentTask.project_id) {
+        router.push('/quick-transcribe');
         return;
       }
 
@@ -29,6 +35,8 @@ export default function QuickGenerateNavigation() {
         router.push('/generate-voice');
       } else if (currentTask.type === 'training') {
         router.push('/fine-tuning');
+      } else if (currentTask.type === 'transcription') {
+        router.push('/transcription');
       }
     }
   };
@@ -46,6 +54,9 @@ export default function QuickGenerateNavigation() {
     }
     if (taskType === 'quick_generation') {
       return t('navigation.viewRunningQuickGeneration');
+    }
+    if (taskType === 'transcription') {
+      return t('navigation.viewRunningTranscription');
     }
     return t('navigation.viewRunningTask');
   };
@@ -93,7 +104,9 @@ export default function QuickGenerateNavigation() {
             <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <span className="text-sm font-medium text-emerald-300">{t('quickGenerate.modeTitle')}</span>
+            <span className="text-sm font-medium text-emerald-300">
+              {pathname === '/quick-transcribe' ? t('transcription.modeTitle') : t('quickGenerate.modeTitle')}
+            </span>
           </div>
           <p className="text-xs text-gray-400 mt-1">{t('quickGenerate.modeDescription')}</p>
         </div>
@@ -107,19 +120,38 @@ export default function QuickGenerateNavigation() {
             </h3>
           </div>
 
-          <Link
-            href="/quick-generate"
-            className="flex items-center space-x-3 px-6 py-3 transition-all duration-200 relative bg-blue-600 text-white"
-          >
-            {/* Active indicator */}
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-400" />
-            <div className="text-white">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-              </svg>
-            </div>
-            <span className="font-medium text-sm">{t('quickGenerate.generateVoice')}</span>
-          </Link>
+          {[
+            {
+              path: "/quick-generate",
+              label: t('quickGenerate.generateVoice'),
+              icon: "M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z",
+            },
+            {
+              path: "/quick-transcribe",
+              label: t('navigation.transcription'),
+              icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+            },
+          ].map((item) => {
+            const isActive = pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={`flex items-center space-x-3 px-6 py-3 transition-all duration-200 relative ${
+                  isActive ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                }`}
+              >
+                {/* Active indicator */}
+                {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-400" />}
+                <div className={isActive ? "text-white" : "text-gray-400"}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+                  </svg>
+                </div>
+                <span className="font-medium text-sm">{item.label}</span>
+              </Link>
+            );
+          })}
         </div>
 
         {/* Footer */}
@@ -164,6 +196,8 @@ export default function QuickGenerateNavigation() {
                     ? 'bg-blue-600 hover:bg-blue-700 text-white'
                     : taskType === 'quick_generation'
                     ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : taskType === 'transcription'
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
                     : 'bg-purple-600 hover:bg-purple-700 text-white'
                 }`}
                 title={getTaskTooltip()}
@@ -178,6 +212,11 @@ export default function QuickGenerateNavigation() {
                   // Lightning/Quick Generation Icon
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                ) : taskType === 'transcription' ? (
+                  // Document/Transcription Icon
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 ) : (
                   // Training/Learning Icon

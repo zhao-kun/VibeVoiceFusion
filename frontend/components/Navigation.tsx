@@ -57,6 +57,16 @@ const getMenuGroups = (): MenuGroup[] => [
           </svg>
         ),
       },
+      {
+        id: "transcription",
+        labelKey: "navigation.transcription",
+        path: "/transcription",
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        ),
+      },
     ],
   },
   {
@@ -116,6 +126,12 @@ export default function Navigation() {
         return;
       }
 
+      // Standalone transcriptions have no project
+      if (currentTask.type === 'transcription' && !currentTask.project_id) {
+        router.push('/quick-transcribe');
+        return;
+      }
+
       // For project-based tasks, select the project first
       if (currentTask.project_id) {
         if (currentProject?.id !== currentTask.project_id) {
@@ -126,6 +142,8 @@ export default function Navigation() {
           router.push('/generate-voice');
         } else if (currentTask.type === 'training') {
           router.push('/fine-tuning');
+        } else if (currentTask.type === 'transcription') {
+          router.push('/transcription');
         }
       }
     }
@@ -144,6 +162,9 @@ export default function Navigation() {
     }
     if (taskType === 'quick_generation') {
       return t('navigation.viewRunningQuickGeneration');
+    }
+    if (taskType === 'transcription') {
+      return t('navigation.viewRunningTranscription');
     }
     return t('navigation.viewRunningTask');
   };
@@ -361,6 +382,8 @@ export default function Navigation() {
                   ? 'bg-blue-600 hover:bg-blue-700 text-white'
                   : taskType === 'quick_generation'
                   ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : taskType === 'transcription'
+                  ? 'bg-amber-600 hover:bg-amber-700 text-white'
                   : 'bg-purple-600 hover:bg-purple-700 text-white'
               }`}
               title={getTaskTooltip()}
@@ -375,6 +398,11 @@ export default function Navigation() {
                 // Lightning/Quick Generation Icon
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              ) : taskType === 'transcription' ? (
+                // Document/Transcription Icon
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               ) : (
                 // Training/Learning Icon

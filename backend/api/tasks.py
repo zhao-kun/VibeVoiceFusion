@@ -6,6 +6,7 @@ from flask import jsonify, current_app
 from backend.api import api_bp
 from backend.inference.inference import InferenceBase
 from backend.inference.quick_generate_inference import QuickGenerateInferenceBase
+from backend.inference.asr_inference import ASRInferenceBase
 from backend.training.engine import BaseTrainingEngine
 from backend.task_manager.task import gm, Task
 from backend.services.project_service import ProjectService
@@ -46,7 +47,7 @@ def get_current_task():
         {
             "message": "...",
             "task": {
-                "type": "inference" | "training" | null,
+                "type": "inference" | "training" | "quick_generation" | "transcription" | null,
                 "project_id": "..." | null,
                 "data": { ... task-specific data ... } | null
             }
@@ -138,6 +139,18 @@ def get_current_task():
                 'type': 'quick_generation',
                 'project_id': None,  # Quick generation has no project
                 'data': quick_gen.to_dict()
+            }
+        }), 200
+
+    if isinstance(unwrapped, ASRInferenceBase):
+        transcription = unwrapped.get_transcription()
+
+        return jsonify({
+            'message': 'Current transcription task retrieved successfully',
+            'task': {
+                'type': 'transcription',
+                'project_id': transcription.project_id,
+                'data': transcription.to_dict()
             }
         }), 200
 
