@@ -26,18 +26,9 @@
 
 ## Overview
 
-### Purpose
+### Introduction
 
-VibeVoiceFusion is a **web application** for generating high-quality, multi-speaker synthetic speech with voice cloning capabilities. Built on Microsoft's VibeVoice model (AR + diffusion architecture), this project provides a complete full-stack solution with voice generation, LoRA fine-tuning, dataset management, batch generation, and advanced VRAM optimization features.
-
-**Key Goals:**
-- Provide a user-friendly interface for voice generation without requiring coding knowledge
-- Enable efficient multi-speaker dialog synthesis with distinct voice characteristics
-- Support LoRA fine-tuning for custom voice adaptation and style transfer
-- Generate multiple audio variations in batch with different random seeds
-- Optimize memory usage for consumer-grade GPUs (10GB+ VRAM)
-- Support bilingual workflows (English/Chinese)
-- Offer both web UI and CLI interfaces for different use cases
+VibeVoiceFusion is a web application for **multi-speaker speech generation with voice cloning** and **speech recognition**, built on Microsoft's VibeVoice models. It brings text-to-speech, file transcription and live microphone transcription together in one bilingual (English/Chinese) web interface. It also covers LoRA fine-tuning and an OpenAI-compatible API, and it runs on consumer GPUs with 10GB+ of VRAM.
 
 <div align="center">
   <a href="https://youtu.be/J9pmcOBWN4c" target="_blank">
@@ -45,123 +36,39 @@ VibeVoiceFusion is a **web application** for generating high-quality, multi-spea
   </a>
 </div>
 
-### Principle
-
-VibeVoice combines **autoregressive (AR)** and **diffusion** techniques for text-to-speech synthesis:
-
-1. **Text Processing**: Input text is tokenized and processed through a Qwen-based language model backbone
-2. **Voice Encoding**: Reference voice samples are encoded into acoustic and semantic embeddings
-3. **AR Generation**: The model autoregressively generates speech tokens conditioned on text and voice embeddings
-4. **Diffusion Refinement**: A DPM-Solver-based diffusion head converts tokens to high-quality audio waveforms
-5. **Voice Cloning**: The unified processor preserves speaker characteristics from reference audio samples
-
-**Technical Highlights:**
-- **Model Architecture**: Qwen backbone + VAE acoustic tokenizer + semantic encoder + diffusion head
-- **Quantization**: Float8 (FP8 E4M3FN) support for ~50% VRAM reduction with minimal quality loss
-- **Layer Offloading**: Dynamic CPU/GPU memory management for running on limited VRAM
-- **Attention Mechanism**: PyTorch native SDPA for maximum compatibility
-
 ### Features
 
-#### Quick Generation
+#### Speech Generation
 
-- **One-Click Generation**: Generate voice without creating projects, speakers, or sessions
-- **Voice Source Options**:
-  - Upload custom audio files (WAV, MP3, M4A, FLAC, WebM) - up to 4 files
-  - Select from preset voice samples with language/gender filters
-- **Auto Mode Detection**: Automatically detects dialogue vs narration format
-- **Multi-Voice Support**: Use up to 4 voice prompts for generation
-- **Generation History**: Persistent history with expandable details, bulk delete
-- **Per-Item Progress**: Real-time progress tracking for each generating voice
+- **Multi-speaker dialogue** with voice cloning from short reference samples
+- **Narration mode** for single-speaker content such as audiobooks and articles
+- **Quick Generate**: generate without any project setup, using uploaded or preset voices
+- **Multi-Generation**: 2-20 variations with different seeds in one run
+- **Dialog editor** with a visual editor and a text editor
 
-#### Complete Web Application
+#### Speech Recognition
 
-- **Project Management**: Organize voice generation projects with metadata and descriptions
-- **Speaker/Voice Management**:
-  - Upload and manage reference voice samples (WAV, MP3, M4A, FLAC, WebM)
-  - Audio preview with playback controls
-  - Voice file replacement with automatic cache-busting
-  - Audio trimming functionality
-- **Dialog Editor**:
-  - Visual editor with drag-and-drop line reordering
-  - Text editor mode for bulk editing
-  - Support for multi-speaker dialogs (up to 4+ speakers)
-  - **Narration mode** for single-speaker content (audiobooks, articles, podcasts)
-  - Real-time preview and validation
-- **Generation System**:
-  - Queue-based task management (prevents GPU conflicts)
-  - Real-time progress monitoring with live updates
-  - Configurable parameters (CFG scale, random seed, model precision)
-  - **Multi-Generation**: Generate 2-20 audio variations in a single batch with different seeds
-  - LoRA model support with configurable weight (0-1]
-  - Generation history with filtering, sorting, and pagination
-  - Audio playback and download for completed generations
+- **File transcription** with VibeVoice-ASR: segments with timestamps and speaker labels, downloadable as TXT or JSON
+- **Live transcription** from the browser microphone, with text streaming in as you speak
+- Saved transcription history, standalone or inside a project
 
 #### LoRA Fine-Tuning
 
-- **Dataset Management**:
-  - Create and manage training datasets with audio/text pairs
-  - Import datasets from ZIP archives or local folders
-  - JSONL format for efficient data handling
-  - Pagination and search for large datasets
-  - Export datasets for backup or sharing
+- **Dataset management** with ZIP or folder import and export
+- **LoRA training** with live loss and learning-rate charts
+- Trained LoRAs can be applied during generation with an adjustable weight
 
-- **Training System**:
-  - LoRA (Low-Rank Adaptation) fine-tuning for voice customization
-  - Configurable training parameters (epochs, learning rate, LoRA rank, batch size)
-  - Layer offloading support for training on consumer GPUs
-  - Real-time training progress with tqdm-style progress bar
-  - Live training metrics charts (Loss, Learning Rate, Timing)
-  - TensorBoard integration for detailed metrics
-  - Training history with status tracking (Prepare, Training, Completed, Failed)
-  - OOM detection with helpful suggestions for recovery
+#### Runs on Consumer GPUs
 
-- **LoRA Model Usage**:
-  - Select trained LoRA models during voice generation
-  - Configurable LoRA weight for blending with base model
-  - Multiple LoRA files per training job (epoch checkpoints + final)
+- **Float8 quantization** halves model memory (RTX 40 series and newer)
+- **Layer offloading** presets (Balanced / Aggressive / Extreme) for GPUs with 10GB+ of VRAM. See [VRAM Requirements](#vram-requirements).
 
-#### VRAM Optimization
+#### Integration & Deployment
 
-- **Layer Offloading**: Move transformer layers between CPU/GPU to reduce VRAM requirements
-  - **Balanced** (12 GPU / 16 CPU layers): ~5GB VRAM savings, ~2.0x slower - RTX 3060 16GB, 4070
-  - **Aggressive** (8 GPU / 20 CPU layers): ~6GB VRAM savings, ~2.5x slower - RTX 3060 12GB, 4060
-  - **Extreme** (4 GPU / 24 CPU layers): ~7GB VRAM savings, ~3.5x slower - RTX 3060 10GB (minimum)
-- **Float8 Quantization**: Reduce model size from ~14GB to ~7GB with comparable quality. (Supported by RTX 40 series and above graphics cards.)
-- **Adaptive Configuration**: Automatic VRAM estimation and optimal layer distribution
-
-**VRAM Requirements:**
-
-| Configuration | GPU Layers | VRAM Usage | Speed | Target Hardware |
-|--------------|-----------|------------|-------|-----------------|
-| No offloading | 28 | 11-14GB | 1.0x | RTX 4090, A100, 3090 |
-| Balanced | 12 | 6-8GB | 0.70x | RTX 4070, 3080 16GB |
-| Aggressive | 8 | 5-7GB | 0.55x | RTX 3060 12GB |
-| Extreme | 4 | 4-5GB | 0.40x | RTX 3080 10GB |
-
-> Float8 Quantization only supports by RTX 40XX or 50XX serial nvidia card.
-
-#### Internationalization
-
-- **Full Bilingual Support**: Complete English/Chinese UI with 360+ translation keys
-- **Auto-Detection**: Automatically detects browser language on first visit
-- **Persistent Preference**: Language selection saved in localStorage
-- **Backend i18n**: API error messages and responses translated to user's language
-
-#### Docker Deployment
-
-- **Multi-Stage Build**: Optimized Dockerfile with frontend build, Python venv, and model download
-- **Self-Contained**: Clones from GitHub and builds entirely from source
-- **HuggingFace Integration**: Automatically downloads model file (~3-4GB) during build
-
-#### Additional Features
-
-- **Responsive Design**: Mobile-friendly interface with Tailwind CSS
-- **Real-Time Updates**: WebSocket-free polling with smart update intervals (2s active, 60s background)
-- **Audio Cache-Busting**: Ensures audio updates are immediately reflected
-- **Toast Notifications**: User-friendly feedback for all operations
-- **Dark Mode Ready**: Modern UI with consistent styling
-- **Accessibility**: Keyboard navigation and ARIA labels
+- **OpenAI-compatible API**: `/v1/audio/speech`, `/v1/audio/transcriptions` and the Realtime WebSocket `/v1/realtime`, so existing OpenAI SDKs work as-is
+- **Full English/Chinese UI** with automatic language detection
+- **Docker image** on Docker Hub
+- **CLI tools** for TTS, streaming TTS with Realtime 0.5B, ASR, and model conversion
 
 ---
 
@@ -497,6 +404,17 @@ Environment variables (optional):
 export WORKSPACE_DIR=/path/to/workspace  # Default: ./workspace
 export FLASK_DEBUG=False  # Production mode
 ```
+
+#### VRAM Requirements
+
+| Configuration | GPU Layers | VRAM Usage | Speed | Target Hardware |
+|--------------|-----------|------------|-------|-----------------|
+| No offloading | 28 | 11-14GB | 1.0x | RTX 4090, A100, 3090 |
+| Balanced | 12 | 6-8GB | 0.70x | RTX 4070, 3080 16GB |
+| Aggressive | 8 | 5-7GB | 0.55x | RTX 3060 12GB |
+| Extreme | 4 | 4-5GB | 0.40x | RTX 3080 10GB |
+
+> Float8 quantization is only supported on NVIDIA RTX 40 and 50 series GPUs. See [docs/offloading.md](docs/offloading.md) for offloading details.
 
 #### Frontend Configuration
 
