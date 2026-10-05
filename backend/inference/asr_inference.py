@@ -2,7 +2,6 @@
 ASR Inference Engine - transcribes audio with VibeVoice-ASR
 """
 import copy
-import gc
 import json
 import random
 import time
@@ -15,6 +14,7 @@ import torch
 from flask import current_app
 
 from backend.models.transcription import Transcription, transcript_plain_text
+from backend.inference.model_cache import model_cache, offload_cache_key
 from config.configuration_vibevoice import InferencePhase
 from util.logger import get_logger
 
@@ -175,6 +175,17 @@ class ASRInferenceBase(ABC):
     def _load_model(self, dtype: torch.dtype):
         pass
 
+    @abstractmethod
+    def _model_cache_key(self, dtype: torch.dtype) -> tuple:
+        pass
+
+    def _acquire_model(self, dtype: torch.dtype):
+        """Reuse the resident model when possible; the visitor still records the (near zero) load time."""
+        load_start = time.time()
+        self.model = model_cache.get_model(self._model_cache_key(dtype), lambda: self._load_model(dtype=dtype))
+        self.visitor.visit_model_loaded(time.time() - load_start)
+        return self.model
+
     def run_inference(self):
         """Run preprocessing, model loading and transcription"""
         from util.rand_init import get_generator
@@ -188,9 +199,7 @@ class ASRInferenceBase(ABC):
                     f"{inputs['input_ids'].shape[1]} prompt tokens)")
 
         load_dtype = torch.float8_e4m3fn if self.model_dtype == "float8_e4m3fn" else torch.bfloat16
-        load_start = time.time()
-        model = self._load_model(dtype=load_dtype)
-        self.visitor.visit_model_loaded(time.time() - load_start)
+        model = self._acquire_model(load_dtype)
 
         get_generator(self.seeds, force_set=True)
         self.visitor.visit_inference_start()
@@ -220,27 +229,8 @@ class ASRInferenceBase(ABC):
         del processor
 
     def finalize(self):
-        """Clean up GPU memory after inference."""
-        if self.model is not None:
-            if getattr(self.model, 'offloader', None) is not None:
-                try:
-                    self.model.offloader.cleanup()
-                    self.model.offloader = None
-                except Exception as e:
-                    logger.warning(f"Failed to cleanup offloader: {e}")
-            try:
-                self.model.to('cpu')
-            except Exception:
-                pass
-            del self.model
-            self.model = None
-
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-            torch.cuda.empty_cache()
-
-        logger.info("GPU memory cleanup completed")
+        """Release this task's model reference; the model itself stays resident in model_cache."""
+        self.model = None
 
 
 class ASRInferenceEngine(ASRInferenceBase):
@@ -253,7 +243,11 @@ class ASRInferenceEngine(ASRInferenceBase):
     def _load_processor(self):
         _, _, VibeVoiceASRProcessor = _get_model_classes()
         model_dir = str(self.model_dir) if self.model_dir.is_dir() else None
-        return VibeVoiceASRProcessor.from_pretrained(model_dir)
+        return model_cache.get_processor(('vibevoice-asr', model_dir),
+                                         lambda: VibeVoiceASRProcessor.from_pretrained(model_dir))
+
+    def _model_cache_key(self, dtype: torch.dtype) -> tuple:
+        return ('vibevoice-asr', str(self.model_dir), str(dtype), offload_cache_key(self.offload_config))
 
     def _resolve_checkpoint(self, dtype: torch.dtype):
         """Prefer a converted single-file checkpoint; otherwise load the HF directory and cast on load."""
@@ -296,7 +290,6 @@ class ASRInferenceEngine(ASRInferenceBase):
             dtype=cast_dtype,
         )
         model.eval()
-        self.model = model
         return model
 
 
@@ -374,3 +367,6 @@ class FakeASRInferenceEngine(ASRInferenceBase):
         else:
             logger.info("[FAKE] Layer offloading disabled")
         return FakeASRModel()
+
+    def _model_cache_key(self, dtype: torch.dtype) -> tuple:
+        return ('fake-vibevoice-asr', None, str(dtype), offload_cache_key(self.offload_config))

@@ -29,6 +29,8 @@ class Config:
     MODEL_PATH = os.environ.get('MODEL_PATH', './models/vibevoice')
     MODEL_DEVICE = os.environ.get('MODEL_DEVICE', 'cuda')  # or 'cpu'
     ASR_MODEL_PATH = os.environ.get('ASR_MODEL_PATH', './models/VibeVoice-ASR')
+    # Seconds a loaded model may sit idle on the GPU before it is unloaded (0 = keep it loaded)
+    MODEL_CACHE_IDLE_SECONDS = float(os.environ.get('MODEL_CACHE_IDLE_SECONDS', 0))
 
     # Generation settings
     MAX_GENERATION_TIME = int(os.environ.get('MAX_GENERATION_TIME', 300))  # 5 minutes

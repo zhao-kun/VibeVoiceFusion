@@ -1,5 +1,6 @@
 
 from datetime import datetime
+from backend.inference.model_cache import model_cache
 from backend.task_manager.task import FAILURE_TYPE_GENERAL, Task
 from backend.training.engine import BaseTrainingEngine
 from util.logger import get_logger
@@ -17,6 +18,7 @@ class TrainingTask(Task):
         return cls(task_id, training_engine)
 
     def run(self):
+        model_cache.evict(reason="training needs the GPU")
         self.training_engine.train()
 
     def task_failure(self, error_msg: str, failure_type: str = FAILURE_TYPE_GENERAL):

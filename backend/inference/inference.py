@@ -1,7 +1,6 @@
 import base64
 import copy
 from datetime import datetime
-import gc
 import random
 from typing import Union
 import time
@@ -16,6 +15,7 @@ from vibevoice.modular.custom_offloading_utils import OffloadConfig
 from vibevoice.processor.vibevoice_processor import VibeVoiceProcessor
 from config.configuration_vibevoice import DEFAULT_CONFIG, VibeVoiceConfig
 from backend.models.generation import Generation
+from backend.inference.model_cache import model_cache, tts_model_cache_key
 from backend.services.speaker_service import SpeakerService
 from backend.services.dialog_session_service import DialogSessionService
 from util.rand_init import get_generator
@@ -148,6 +148,10 @@ class InferenceBase(ABC):
     def _load_model(self, dtype: torch.dtype, config: str = None):
         pass
 
+    @abstractmethod
+    def _model_cache_key(self, dtype: torch.dtype) -> tuple:
+        pass
+
     def failure(self, message: str, failure_type: str):
         self.visitor.visit_failed(message, failure_type)
 
@@ -209,13 +213,14 @@ class InferenceBase(ABC):
                     f"attn_implementation: {self.attn_implementation}")
 
         # only for testing purpose, load a fake model
-        model = self._load_model(dtype=load_dtype)
+        model = model_cache.get_model(self._model_cache_key(load_dtype), lambda: self._load_model(dtype=load_dtype))
+        self.model = model
 
         self.visitor.visit_inference_start(scripts=scripts,
                                            unique_speaker_names=unique_speaker_names,
                                            voice_sample=voice_sample,
                                            max_speaker_id=max_speaker_id)
-        processor = VibeVoiceProcessor.from_pretrained(None)
+        processor = model_cache.get_processor(('vibevoice-tts',), lambda: VibeVoiceProcessor.from_pretrained(None))
         for batch_idx in range(self.batch_size):
             get_generator(self.seeds, force_set=True)
             self.visitor.visit_inference_batch_start(batch_index=batch_idx, seeds=self.seeds)
@@ -264,34 +269,8 @@ class InferenceBase(ABC):
         return self.get_generation().to_dict()
     
     def finalize(self):
-        """Clean up GPU memory after inference."""
-        if hasattr(self, 'model') and self.model is not None:
-            # Clean up offloader first (releases offloaded layer references)
-            if hasattr(self.model, 'offloader') and self.model.offloader is not None:
-                try:
-                    self.model.offloader.cleanup()
-                    self.model.offloader = None
-                except Exception as e:
-                    logger.warning(f"Failed to cleanup offloader: {e}")
-
-            # Move model to CPU first to free VRAM
-            try:
-                self.model.to('cpu')
-            except Exception:
-                pass  # Model might already be partially on CPU
-
-            del self.model
-            self.model = None
-
-        # Force Python garbage collection to release references
-        gc.collect()
-
-        # Synchronize CUDA to ensure all operations complete
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-            torch.cuda.empty_cache()
-
-        logger.info("GPU memory cleanup completed")
+        """Release this task's model reference; the model itself stays resident in model_cache."""
+        self.model = None
 
 class InferenceEngine(InferenceBase):
     def __init__(self, generation, speaker_service, dialog_service, meta_file_path: str,
@@ -345,8 +324,11 @@ class InferenceEngine(InferenceBase):
         )
 
         model.eval()
-        self.model = model  # Store model for later access (e.g., metrics collection)
         return model
+
+    def _model_cache_key(self, dtype: torch.dtype) -> tuple:
+        return tts_model_cache_key('vibevoice-tts', self.model_file, dtype, self.attn_implementation,
+                                   self.offload_config, self.lora_model_path, self.lora_weight)
 
     def _collect_offloading_metrics(self, generation_time: float) -> Optional[Dict[str, Any]]:
         """
@@ -457,6 +439,10 @@ class FakeInferenceEngine(InferenceBase):
         else:
             logger.info("[FAKE] Layer offloading disabled")
         return FakeModel()
+
+    def _model_cache_key(self, dtype: torch.dtype) -> tuple:
+        return tts_model_cache_key('fake-vibevoice-tts', None, dtype, self.attn_implementation,
+                                   self.offload_config, self.lora_model_path, self.lora_weight)
 
     def _generate_fake_offloading_metrics(self, generation_time: float, num_tokens: int = 100) -> Optional[Dict[str, Any]]:
         """

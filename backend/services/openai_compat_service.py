@@ -51,7 +51,7 @@ FORMAT_MIME_TYPES = {
 }
 
 # Polling and timeout configuration
-POLL_INTERVAL = 0.5  # seconds
+POLL_INTERVAL = 0.5  # seconds; completion wakes the wait immediately, this only bounds each wait
 DEFAULT_TIMEOUT = 300  # seconds
 # Long recordings (the model accepts up to ~60 minutes) decode far slower than speech generation
 TRANSCRIPTION_TIMEOUT = 1800  # seconds
@@ -173,7 +173,7 @@ class OpenAICompatService:
         request_id = transcription.request_id
         start_time = time.time()
         while time.time() - start_time < timeout:
-            time.sleep(POLL_INTERVAL)
+            finished = gm.wait_for_task(request_id, POLL_INTERVAL)
 
             current = transcription_service.get_transcription(request_id)
             if not current:
@@ -182,6 +182,8 @@ class OpenAICompatService:
                 return current, None, None
             if current.status == InferencePhase.FAILED:
                 return None, current.error_message or "Transcription failed.", 500
+            if finished:
+                return None, "Transcription task ended without a result.", 500
 
         return None, "Transcription timed out. The server may be under heavy load.", 504
 
@@ -211,9 +213,7 @@ class OpenAICompatService:
         if not preset_path:
             return None, f"Voice file not found: {voice_filename}", 500
 
-        # Copy preset voice to quick generate voices dir and save
-        voice_data = preset_path.read_bytes()
-        saved_filename = self.quick_generate_service.save_voice_file(voice_data, voice_filename)
+        saved_filename = self.quick_generate_service.save_preset_voice_file(preset_path)
 
         # Start generation
         quick_gen = self.quick_generate_service.start_generation(
@@ -232,7 +232,7 @@ class OpenAICompatService:
         # Poll until completion or timeout
         start_time = time.time()
         while time.time() - start_time < timeout:
-            time.sleep(POLL_INTERVAL)
+            finished = gm.wait_for_task(request_id, POLL_INTERVAL)
 
             gen = self.quick_generate_service.get_generation(request_id)
             if not gen:
@@ -257,6 +257,9 @@ class OpenAICompatService:
             if gen.status == InferencePhase.FAILED:
                 error_msg = gen.error_message or "Generation failed."
                 return None, error_msg, 500
+
+            if finished:
+                return None, "Generation task ended without a result.", 500
 
         # Timeout
         return None, "Generation timed out. The server may be under heavy load.", 504

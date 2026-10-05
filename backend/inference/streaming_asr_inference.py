@@ -9,7 +9,6 @@ import os
 import queue
 import tempfile
 import threading
-import time
 import wave
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -383,9 +382,7 @@ class StreamingASRMixin:
 
         processor = self._load_processor()
         load_dtype = torch.float8_e4m3fn if self.model_dtype == "float8_e4m3fn" else torch.bfloat16
-        load_start = time.time()
-        model = self._load_model(dtype=load_dtype)
-        self.visitor.visit_model_loaded(time.time() - load_start)
+        model = self._acquire_model(load_dtype)
 
         get_generator(self.seeds, force_set=True)
         self.visitor.visit_inference_start()

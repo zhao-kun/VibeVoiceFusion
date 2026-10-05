@@ -36,6 +36,9 @@ def create_app(config_name='production') -> Flask:
     logger.info(f"Using configuration: {config_class}")
     app.config.from_object(config_class)
 
+    from backend.inference.model_cache import model_cache
+    model_cache.idle_seconds = app.config['MODEL_CACHE_IDLE_SECONDS']
+
     # Initialize CORS
     CORS(app, origins=app.config['CORS_ORIGINS'], supports_credentials=True)
 

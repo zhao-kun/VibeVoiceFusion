@@ -85,7 +85,7 @@ OpenAI error format:
 
 ### Key Behavioral Differences
 
-1. **Latency**: OpenAI TTS responds in ~1-3 seconds. VibeVoice generation takes 10-60+ seconds depending on text length and hardware. Clients should expect longer response times.
+1. **Latency**: OpenAI TTS responds in ~1-3 seconds. VibeVoice generation takes 10-60+ seconds depending on text length and hardware. Clients should expect longer response times. The first request also pays the model load; later requests reuse the model that stays loaded on the GPU (see [Model Residency](#model-residency)).
 
 2. **Concurrency**: OpenAI handles concurrent requests. VibeVoice has a single-thread GPU task queue — only one generation runs at a time. Concurrent requests get 503.
 
@@ -216,6 +216,20 @@ This endpoint does not require authentication.
 | `STREAMING_ASR_MAX_WINDOW_SECONDS` | 30 | Realtime transcription: longest window re-transcribed per pass |
 | `STREAMING_ASR_SILENCE_COMMIT_SECONDS` | 1.0 | Realtime transcription: trailing silence that commits the window |
 | `STREAMING_ASR_SILENCE_RMS` | 0.008 | Realtime transcription: RMS level treated as silence |
+| `MODEL_CACHE_IDLE_SECONDS` | 0 | Unload the resident model after it has been idle this many seconds. `0` keeps it loaded until another model is needed. |
+
+### Model Residency
+
+The last used model stays loaded on the GPU between requests (`backend/inference/model_cache.py`), so back-to-back requests skip the load from disk. Only one model is kept at a time, shared by all features (OpenAI API, Quick Generate, project generation, transcription, live transcription). It is unloaded when:
+
+- a request needs a different model: TTS ↔ ASR, a different `model` dtype, offloading preset, or LoRA path/weight
+- a training job starts (training needs the whole GPU)
+- a task fails, so the next request starts from a clean model
+- it has been idle for `MODEL_CACHE_IDLE_SECONDS` (when set)
+
+While a model is resident its VRAM stays allocated even when the server is idle. Set `MODEL_CACHE_IDLE_SECONDS` if other processes need to share the GPU.
+
+See [Model Residency & Task Manager Design](model-residency.md) for the cache keys, eviction rules and task manager details.
 
 ### Server-Side Constants
 
@@ -225,7 +239,7 @@ These are defined in `backend/services/openai_compat_service.py`:
 |----------|-------|-------------|
 | `DEFAULT_TIMEOUT` | `300` seconds | Maximum time the server will block waiting for generation to complete. Returns `504 Gateway Timeout` if exceeded. |
 | `TRANSCRIPTION_TIMEOUT` | `1800` seconds | Same, for `/v1/audio/transcriptions` (long recordings take longer to decode). |
-| `POLL_INTERVAL` | `0.5` seconds | Internal polling frequency when checking generation status. |
+| `POLL_INTERVAL` | `0.5` seconds | Upper bound of each wait for the task. The response is sent as soon as the task finishes, not on the next poll tick. |
 | Max input length | `4096` characters | Maximum allowed length for the `input` text field. |
 
 ### Client-Side Timeout Recommendations

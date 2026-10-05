@@ -6,7 +6,6 @@ import copy
 import random
 import time
 import torch
-import gc
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +14,7 @@ from typing import Dict, Any, Optional, Union, List
 from flask import current_app
 
 from backend.models.quick_generate import QuickGenerate, QuickGenerateItem, detect_mode, parse_dialogue_speakers
+from backend.inference.model_cache import model_cache, tts_model_cache_key
 from config.configuration_vibevoice import DEFAULT_CONFIG, VibeVoiceConfig, InferencePhase
 from util.logger import get_logger
 
@@ -234,6 +234,10 @@ class QuickGenerateInferenceBase(ABC):
         pass
 
     @abstractmethod
+    def _model_cache_key(self, dtype: torch.dtype) -> tuple:
+        pass
+
+    @abstractmethod
     def _save_audio(self, outputs, processor, generation_time: float, input_tokens: int,
                     batch_index: int, **kwargs) -> None:
         pass
@@ -338,14 +342,15 @@ class QuickGenerateInferenceBase(ABC):
 
         logger.info(f"Loading model with dtype: {load_dtype}, attn_implementation: {self.attn_implementation}")
 
-        model = self._load_model(dtype=load_dtype)
+        model = model_cache.get_model(self._model_cache_key(load_dtype), lambda: self._load_model(dtype=load_dtype))
+        self.model = model
 
         # Start inference
         self.visitor.visit_inference_start(scripts=[full_script])
 
         _, _, _, VibeVoiceProcessor = _get_model_classes()
 
-        processor = VibeVoiceProcessor.from_pretrained(None)
+        processor = model_cache.get_processor(('vibevoice-tts',), lambda: VibeVoiceProcessor.from_pretrained(None))
         for batch_idx in range(self.batch_size):
             get_generator(self.seeds, force_set=True)
             self.visitor.visit_inference_batch_start(batch_index=batch_idx, seeds=self.seeds)
@@ -393,34 +398,8 @@ class QuickGenerateInferenceBase(ABC):
         del outputs
     
     def finalize(self):
-        """Clean up GPU memory after inference."""
-        if hasattr(self, 'model') and self.model is not None:
-            # Clean up offloader first (releases offloaded layer references)
-            if hasattr(self.model, 'offloader') and self.model.offloader is not None:
-                try:
-                    self.model.offloader.cleanup()
-                    self.model.offloader = None
-                except Exception as e:
-                    logger.warning(f"Failed to cleanup offloader: {e}")
-
-            # Move model to CPU first to free VRAM
-            try:
-                self.model.to('cpu')
-            except Exception:
-                pass  # Model might already be partially on CPU
-
-            del self.model
-            self.model = None
-
-        # Force Python garbage collection to release references
-        gc.collect()
-
-        # Synchronize CUDA to ensure all operations complete
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-            torch.cuda.empty_cache()
-
-        logger.info("GPU memory cleanup completed")        
+        """Release this task's model reference; the model itself stays resident in model_cache."""
+        self.model = None
 
 
 class QuickGenerateInferenceEngine(QuickGenerateInferenceBase):
@@ -459,8 +438,11 @@ class QuickGenerateInferenceEngine(QuickGenerateInferenceBase):
         )
 
         model.eval()
-        self.model = model
         return model
+
+    def _model_cache_key(self, dtype: torch.dtype) -> tuple:
+        return tts_model_cache_key('vibevoice-tts', self.model_file, dtype, self.attn_implementation,
+                                   self.offload_config)
 
     def _save_audio(self, outputs, processor, generation_time: float, input_tokens: int,
                     batch_index: int, **kwargs) -> None:
@@ -502,6 +484,9 @@ class FakeQuickGenerateInferenceEngine(QuickGenerateInferenceBase):
         else:
             logger.info("[FAKE] Layer offloading disabled")
         return FakeQuickGenerateModel()
+
+    def _model_cache_key(self, dtype: torch.dtype) -> tuple:
+        return tts_model_cache_key('fake-vibevoice-tts', None, dtype, self.attn_implementation, self.offload_config)
 
     def _save_audio(self, outputs, processor, generation_time: float, input_tokens: int,
                     batch_index: int, **kwargs) -> None:

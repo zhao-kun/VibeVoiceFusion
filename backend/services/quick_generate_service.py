@@ -2,6 +2,7 @@
 Quick Generate Service - handles voice generation without project setup
 """
 import json
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -118,6 +119,21 @@ class QuickGenerateService:
         with open(voice_path, 'wb') as f:
             f.write(file_data)
 
+        return voice_filename
+
+    def save_preset_voice_file(self, preset_path: Path) -> str:
+        """
+        Copy a preset voice into the voices directory once and reuse that copy on later requests.
+
+        Returns:
+            Saved filename (stable per preset)
+        """
+        voice_filename = f"preset-{preset_path.name}"
+        voice_path = self.voices_dir / voice_filename
+        if not voice_path.exists() or preset_path.stat().st_mtime > voice_path.stat().st_mtime:
+            tmp_path = voice_path.with_name(f"{voice_filename}.{uuid4().hex}.tmp")
+            shutil.copyfile(preset_path, tmp_path)
+            os.replace(tmp_path, voice_path)
         return voice_filename
 
     def start_generation(self, voice_files: List[str], text: str,

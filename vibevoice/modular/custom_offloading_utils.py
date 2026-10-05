@@ -762,6 +762,19 @@ class LayerOffloader:
 
         self.logger.info("="*60)
 
+    def reset_stats(self):
+        """Clear timing and profiling data so stats cover only the next generation"""
+        self.transfer_times = []
+        self.forward_times = defaultdict(list)
+        self.total_transfers = 0
+        self.profile_data = defaultdict(list)
+        self.token_count = 0
+        self.last_profile_print = time.time()
+        if hasattr(self, 'layer_compute_times'):
+            del self.layer_compute_times
+        if hasattr(self, 'forward_start_times'):
+            del self.forward_start_times
+
     def cleanup(self):
         """Remove all hooks and cleanup resources"""
         # Shutdown thread pool
